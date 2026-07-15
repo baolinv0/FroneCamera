@@ -132,7 +132,7 @@ class EvaluationBatchV2(V2Contract):
     task_scope: Literal["front_camera_portrait_tone_semantic_rendering"] = (
         "front_camera_portrait_tone_semantic_rendering"
     )
-    device_ids: list[str]
+    device_ids: list[str] = Field(min_length=2)
     scoring_scope: Literal["batch_relative"] = "batch_relative"
     dataset_version: str
     dimension_policy_version: str
@@ -141,6 +141,12 @@ class EvaluationBatchV2(V2Contract):
     judge_model_version: str
     report_model_version: str | None
     created_at: datetime
+
+    @model_validator(mode="after")
+    def validate_distinct_devices(self) -> EvaluationBatchV2:
+        if len(set(self.device_ids)) != len(self.device_ids):
+            raise ValueError("device IDs must be unique")
+        return self
 
 
 class MatchEvidenceV2(V2Contract):
@@ -291,14 +297,39 @@ class SceneDimensionScoreV2(V2Contract):
     scene_id: str
     dimension_id: DimensionId
     device_id: str
-    latent_quality: float
-    normalized_score: Score100
+    latent_quality: float | None
+    normalized_score: Score100 | None
     confidence: UnitFloat
     diagnostic_weight: UnitFloat
-    objective_adjustment: ObjectiveAdjustment
-    final_score: Score100
+    objective_adjustment: ObjectiveAdjustment | None
+    final_score: Score100 | None
     status: SceneScoreStatus
     contributing_comparison_ids: list[str] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def validate_score_presence(self) -> SceneDimensionScoreV2:
+        score_values = (
+            self.latent_quality,
+            self.normalized_score,
+            self.objective_adjustment,
+            self.final_score,
+        )
+        if self.status is SceneScoreStatus.NOT_APPLICABLE:
+            if any(value is not None for value in score_values):
+                raise ValueError("NOT_APPLICABLE must not carry numeric quality")
+            if self.contributing_comparison_ids:
+                raise ValueError("NOT_APPLICABLE cannot reference scoring comparisons")
+            return self
+        if self.status is SceneScoreStatus.MANUAL_REVIEW:
+            present_count = sum(value is not None for value in score_values)
+            if present_count not in {0, len(score_values)}:
+                raise ValueError(
+                    "MANUAL_REVIEW requires either complete or no numeric quality"
+                )
+            return self
+        if any(value is None for value in score_values):
+            raise ValueError("scored scene status requires complete numeric quality")
+        return self
 
 
 class DeviceDimensionScoreV2(V2Contract):
