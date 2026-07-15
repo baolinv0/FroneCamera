@@ -1,0 +1,111 @@
+from __future__ import annotations
+
+from enum import StrEnum
+
+from pydantic import BaseModel, ConfigDict
+
+SCHEMA_VERSION = "2.0"
+
+
+class V2Contract(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+
+class DimensionId(StrEnum):
+    FACE_EXPOSURE_READABILITY = "face_exposure_readability"
+    HIGHLIGHT_INTEGRITY = "highlight_integrity"
+    SHADOW_BLACK_RENDERING = "shadow_black_rendering"
+    SKIN_AWB = "skin_awb"
+    LIGHTING_CAUSALITY = "lighting_causality"
+    FACE_BACKGROUND_RELATION = "face_background_relation"
+    LOCAL_FACE_LIFT_NATURALNESS = "local_face_lift_naturalness"
+    MULTI_FACE_CONSISTENCY = "multi_face_consistency"
+    SCENE_ADAPTABILITY = "scene_adaptability"
+    ARTIFACT_TEXTURE_CONTROL = "artifact_texture_control"
+
+
+class MatchStatus(StrEnum):
+    CONFIRMED_MANIFEST = "CONFIRMED_MANIFEST"
+    CONFIRMED_MANUAL = "CONFIRMED_MANUAL"
+    AUTO_HIGH_CONFIDENCE = "AUTO_HIGH_CONFIDENCE"
+    PENDING_REVIEW = "PENDING_REVIEW"
+    UNMATCHED = "UNMATCHED"
+    INVALID = "INVALID"
+
+
+class ComparabilityStatus(StrEnum):
+    FULLY_COMPARABLE = "FULLY_COMPARABLE"
+    COMPARABLE_WITH_CONFOUNDERS = "COMPARABLE_WITH_CONFOUNDERS"
+    NOT_COMPARABLE = "NOT_COMPARABLE"
+
+
+class ApplicabilityStatus(StrEnum):
+    APPLICABLE = "APPLICABLE"
+    WEAKLY_APPLICABLE = "WEAKLY_APPLICABLE"
+    NOT_APPLICABLE = "NOT_APPLICABLE"
+    INSUFFICIENT_EVIDENCE = "INSUFFICIENT_EVIDENCE"
+
+
+class DifferenceType(StrEnum):
+    QUALITY = "QUALITY"
+    STYLE_PREFERENCE = "STYLE_PREFERENCE"
+    MIXED = "MIXED"
+    INSUFFICIENT_EVIDENCE = "INSUFFICIENT_EVIDENCE"
+    NOT_APPLICABLE = "NOT_APPLICABLE"
+
+
+class PairwisePreference(StrEnum):
+    A_STRONGLY_BETTER = "A_STRONGLY_BETTER"
+    A_SLIGHTLY_BETTER = "A_SLIGHTLY_BETTER"
+    EQUIVALENT = "EQUIVALENT"
+    B_SLIGHTLY_BETTER = "B_SLIGHTLY_BETTER"
+    B_STRONGLY_BETTER = "B_STRONGLY_BETTER"
+
+
+class JudgeDecisionType(StrEnum):
+    ACCEPT = "ACCEPT"
+    REVISE = "REVISE"
+    REJECT = "REJECT"
+    MANUAL_REVIEW = "MANUAL_REVIEW"
+    INVALID_SAMPLE = "INVALID_SAMPLE"
+
+
+class MechanismAttribution(StrEnum):
+    HARDWARE_ENABLED = "HARDWARE_ENABLED"
+    ALGORITHM_DEFINED = "ALGORITHM_DEFINED"
+    PREFERENCE_DRIVEN = "PREFERENCE_DRIVEN"
+    CAPTURE_LIMITED = "CAPTURE_LIMITED"
+    RECONSTRUCTION_LIMITED = "RECONSTRUCTION_LIMITED"
+    STRATEGY_LIMITED = "STRATEGY_LIMITED"
+    MIXED_CAUSE = "MIXED_CAUSE"
+    INDETERMINATE = "INDETERMINATE"
+
+
+class ReportState(StrEnum):
+    AUTO_REPORT = "AUTO_REPORT"
+    REVIEWED_REPORT = "REVIEWED_REPORT"
+
+
+class FaceRole(StrEnum):
+    PRIMARY = "PRIMARY"
+    SECONDARY = "SECONDARY"
+    UNASSIGNED = "UNASSIGNED"
+
+
+class SceneScoreStatus(StrEnum):
+    AUTO_PASS = "AUTO_PASS"
+    PASS_WITH_NOTE = "PASS_WITH_NOTE"
+    MANUAL_REVIEW = "MANUAL_REVIEW"
+    NOT_APPLICABLE = "NOT_APPLICABLE"
+
+
+class EvidenceGradeV2(StrEnum):
+    A = "A"
+    B = "B"
+    C = "C"
+
+
+class ReportAllowedLevel(StrEnum):
+    OBSERVABLE = "OBSERVABLE"
+    STRATEGY_INFERENCE = "STRATEGY_INFERENCE"
+    INTERNAL_HYPOTHESIS = "INTERNAL_HYPOTHESIS"
