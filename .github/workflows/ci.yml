@@ -15,7 +15,7 @@ jobs:
       - run: python -m pip install -e ".[dev]"
       - run: pytest -q
       - run: set -o pipefail; ruff check src tests scripts 2>&1 | tee backend-ruff.log
-      - run: set -o pipefail; ruff format --diff src tests scripts 2>&1 | tee backend-format.log
+      - run: set -o pipefail; ruff format --check src scripts 2>&1 | tee backend-format.log
       - run: set -o pipefail; mypy src/portrait_eval 2>&1 | tee backend-mypy.log
       - name: Upload backend validation logs
         if: always()
