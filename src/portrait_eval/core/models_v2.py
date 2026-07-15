@@ -323,9 +323,7 @@ class SceneDimensionScoreV2(V2Contract):
         if self.status is SceneScoreStatus.MANUAL_REVIEW:
             present_count = sum(value is not None for value in score_values)
             if present_count not in {0, len(score_values)}:
-                raise ValueError(
-                    "MANUAL_REVIEW requires either complete or no numeric quality"
-                )
+                raise ValueError("MANUAL_REVIEW requires either complete or no numeric quality")
             return self
         if any(value is None for value in score_values):
             raise ValueError("scored scene status requires complete numeric quality")
