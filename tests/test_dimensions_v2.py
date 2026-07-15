@@ -1,7 +1,11 @@
+import pytest
+from pydantic import ValidationError
+
 from portrait_eval.core.dimensions import (
     DIMENSION_BY_ID,
     DIMENSIONS,
     TOTAL_DIMENSION_WEIGHT,
+    DimensionDefinition,
     DimensionScope,
     get_dimension,
 )
@@ -52,3 +56,15 @@ def test_scene_dimensions_are_single_scene_applicable() -> None:
         assert definition.scope is DimensionScope.SCENE
         assert definition.single_scene_applicable is True
         assert definition.required_evidence
+
+
+def test_dimension_definitions_are_immutable() -> None:
+    with pytest.raises(ValidationError, match="frozen"):
+        DIMENSIONS[0].weight = 0.20
+
+
+def test_dimension_definitions_reject_unknown_fields() -> None:
+    payload = DIMENSIONS[0].model_dump()
+    payload["unknown"] = True
+    with pytest.raises(ValidationError, match="Extra inputs are not permitted"):
+        DimensionDefinition.model_validate(payload)
