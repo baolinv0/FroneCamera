@@ -9,10 +9,10 @@ from portrait_eval.corroboration import (
     OpenAICompatibleCorroborationAdapter,
 )
 from portrait_eval.database import Database
-from portrait_eval.pipeline import EvaluationPipeline
 from portrait_eval.research import DisabledSearchProvider, SearxNGSearchProvider
 from portrait_eval.tasking import TaskService
 from portrait_eval.vlm import HeuristicVisionAdapter, OpenAICompatibleVisionAdapter
+from portrait_eval.workflow import run_evaluation_workflow
 
 
 def _adapters(settings: Settings):
@@ -61,14 +61,17 @@ def execute_one(settings: Settings) -> bool:
             if task.kind != "evaluate_project":
                 raise ValueError(f"Unsupported task kind: {task.kind}")
             primary, reviewer, search, corroborator = _adapters(settings)
-            result = EvaluationPipeline(
+            mode = str(task.payload.get("mode", "professional"))
+            result = run_evaluation_workflow(
                 session,
                 settings.workspace,
+                task.project_id,
+                mode,  # type: ignore[arg-type]
                 primary=primary,
                 reviewer=reviewer,
                 search=search,
                 corroborator=corroborator,
-            ).run(task.project_id)
+            )
             service.mark_succeeded(task.id, result)
         except Exception as exc:  # worker boundary must persist failures
             error = f"{type(exc).__name__}: {exc}"
