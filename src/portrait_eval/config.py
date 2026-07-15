@@ -11,6 +11,7 @@ class Settings(BaseSettings):
     workspace: Path = Path("./workspace")
     allowed_roots: list[Path] = Field(default_factory=list)
     api_token: str | None = None
+    report_share_secret: str = "local-only-change-me"
     primary_vlm_url: str | None = None
     primary_vlm_model: str = "Qwen/Qwen3-VL-32B-Instruct"
     reviewer_vlm_url: str | None = None
