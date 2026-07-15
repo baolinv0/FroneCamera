@@ -10,7 +10,7 @@ from typing import Any
 import httpx
 from PIL import Image, ImageOps
 
-from portrait_eval.models import ModelEvaluationResult
+from portrait_eval.models import ModelEvaluationResult, ModelObservation
 
 
 def encode_image_data_url(path: Path, max_edge: int = 1536) -> str:
@@ -115,7 +115,7 @@ class HeuristicVisionAdapter(VisionModelAdapter):
     def analyze(
         self, scene_id: str, image_paths: dict[str, Path], context: dict[str, Any]
     ) -> ModelEvaluationResult:
-        observations = []
+        observations: list[ModelObservation] = []
         metrics = context.get("metrics", {})
         values = {
             device: data.get("whole", {}).get("luma_mean", 0.0) for device, data in metrics.items()
@@ -123,13 +123,16 @@ class HeuristicVisionAdapter(VisionModelAdapter):
         if values:
             brightest = max(values, key=lambda device: values[device])
             observations.append(
-                {
-                    "device_id": brightest,
-                    "dimension": "global_exposure",
-                    "statement": "This output has the highest display-referred mean luminance in the matched group.",
-                    "evidence_refs": [f"metric:{scene_id}:{brightest}:luma_mean"],
-                    "certainty": 0.95,
-                }
+                ModelObservation(
+                    device_id=brightest,
+                    dimension="global_exposure",
+                    statement=(
+                        "This output has the highest display-referred mean luminance in the "
+                        "matched group."
+                    ),
+                    evidence_refs=[f"metric:{scene_id}:{brightest}:luma_mean"],
+                    certainty=0.95,
+                )
             )
         return ModelEvaluationResult(
             scene_id=scene_id,
