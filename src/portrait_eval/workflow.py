@@ -97,7 +97,7 @@ def run_evaluation_workflow(
 
     reports = repo.list_reports(project_id)
     if reports:
-        latest = reports[-1]
+        latest = reports[0]
         result["report_id"] = latest["id"]
         result["report_version"] = latest["version"]
     return result
