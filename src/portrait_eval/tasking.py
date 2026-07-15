@@ -50,13 +50,14 @@ class TaskService:
             )
             if row is None:
                 return None
-            result = self.session.execute(
+            claimed_id = self.session.scalar(
                 update(TaskRow)
                 .where(TaskRow.id == row.id, TaskRow.status == "PENDING")
                 .values(status="RUNNING", attempt_count=TaskRow.attempt_count + 1)
+                .returning(TaskRow.id)
             )
             self.session.commit()
-            if result.rowcount == 1:
+            if claimed_id == row.id:
                 claimed = self.session.get(TaskRow, row.id)
                 if claimed is None:
                     raise RuntimeError("claimed task disappeared")
