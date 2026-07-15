@@ -5,6 +5,7 @@ from PIL import Image
 from portrait_eval.database import Database
 from portrait_eval.pipeline import EvaluationPipeline
 from portrait_eval.repository import Repository
+from portrait_eval.workflow import run_evaluation_workflow
 
 
 def test_pipeline_generates_metrics_claims_and_report(tmp_path: Path) -> None:
@@ -46,13 +47,18 @@ def test_pipeline_quick_mode_creates_final_report_without_blocking_on_reviews(tm
             repo.add_device(project.id, f"Device {index}", str(folder))
         pairing = repo.scan_and_pair(project.id)
         repo.confirm_pairing(project.id, pairing["version"])
-        result = EvaluationPipeline(session, tmp_path / "workspace").run(project.id, mode="quick")
+        result = run_evaluation_workflow(
+            session,
+            tmp_path / "workspace",
+            project.id,
+            mode="quick",
+        )
         reports = repo.list_reports(project.id)
         assert result["mode"] == "quick"
         assert result["status"] == "REPORT_FINALIZED"
-        assert result["report_id"] == reports[-1]["id"]
-        assert reports[-1]["status"] == "final"
-        assert Path(reports[-1]["html_path"]).exists()
+        assert result["report_id"] == reports[0]["id"]
+        assert reports[0]["status"] == "final"
+        assert Path(reports[0]["html_path"]).exists()
 
 
 def test_pipeline_classifies_external_professional_corroboration(tmp_path: Path) -> None:
