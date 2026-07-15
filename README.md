@@ -4,7 +4,34 @@ FroneCamera is a local, evidence-oriented evaluation system for comparing front-
 
 It is designed for imaging engineers who need more than a subjective ranking. The system preserves the chain from source image to pairing, objective measurement, blind model observation, evidence adjudication, external professional-review corroboration, human review, and final report.
 
-## Core workflow
+## Default four-step workflow
+
+The web application now presents the product workflow directly:
+
+```text
+1. Create test data
+2. Run model evaluation
+3. Generate the test report
+4. Open a signed read-only report from another computer
+```
+
+The internal pipeline remains detailed, but the user starts it with one **Run full evaluation** action. Advanced pairing correction, evidence inspection, model conflicts, and human review remain available under **Advanced review and engineering controls**.
+
+### Quick mode
+
+- Runs the complete internal pipeline.
+- Automatically creates an immutable final report.
+- Does not block on open review items.
+- Adds an explicit limitation stating that unresolved low-confidence findings require review before external publication.
+
+### Professional mode
+
+- Runs the same internal pipeline.
+- Creates a draft report.
+- Requires key review items to be resolved before finalization.
+- Is intended for formal research, patent, competitor-analysis, or externally distributed reports.
+
+## Internal evidence workflow
 
 ```text
 N device folders
@@ -19,7 +46,7 @@ N device folders
 → hardware and professional-review search
 → capture-bias assessment and attribution review
 → HTML/JSON/CSV report
-→ human review gate and immutable final report
+→ optional human review gate and immutable final report
 ```
 
 The input does **not** need to follow a fixed 20-scene taxonomy. Arbitrary matched scene groups are the default. A group can contain missing devices, and repeats are only used when explicitly grouped.
@@ -43,7 +70,8 @@ The input does **not** need to follow a fixed 20-scene taxonomy. Arbitrary match
 - Capture-bias and controlled-reshoot recommendations
 - Conservative hardware/capture/reconstruction/rendering attribution cases
 - Persistent atomic task claiming, bounded retries, and Linux worker
-- Browser review console, React/Vite console, and REST API
+- Four-step React/Vite product workflow plus advanced engineering review console
+- Signed read-only HTML/PDF report links for other computers on the same network
 - HTML, JSON, CSV, optional PDF, privacy-preserving project export, and review-aware immutable final reports
 - Native Python and Docker Compose deployment
 
@@ -62,6 +90,18 @@ uv venv --python 3.12
 source .venv/bin/activate
 uv pip install -e ".[dev,pdf]"
 cp .env.example .env
+```
+
+Before LAN use, set secure values in `.env`:
+
+```env
+PORTRAIT_EVAL_API_TOKEN=replace-with-an-admin-token
+PORTRAIT_EVAL_REPORT_SHARE_SECRET=replace-with-a-long-random-secret
+```
+
+Start the API and worker:
+
+```bash
 portrait-eval-api --host 127.0.0.1 --port 7860
 ```
 
@@ -78,6 +118,8 @@ Open `http://127.0.0.1:7860`. From Windows, use an SSH tunnel:
 ssh -L 7860:127.0.0.1:7860 user@linux-server
 ```
 
+For direct LAN access, bind the API to the Linux server's LAN address and restrict access with firewall rules. The generated `/reports/<report-id>?token=<signature>` URL is read-only and does not expose the project-control API token.
+
 ## Quick start: Docker Compose
 
 ```bash
@@ -86,7 +128,7 @@ export FRONECAMERA_MODEL_ROOT=/absolute/path/to/local-models
 docker compose up --build
 ```
 
-The API and built-in console are exposed on `127.0.0.1:7860`; the React console is exposed on `127.0.0.1:8080`.
+The API and built-in console are exposed on `127.0.0.1:7860`; the React console is exposed on `127.0.0.1:8080`. Nginx proxies both `/api/` and signed `/reports/` routes to the API service.
 
 ## Input layout
 
@@ -149,6 +191,7 @@ cd web && npm install && npm test -- --run && npm run build
 
 - [Current design specification](docs/design/front-camera-portrait-evaluation-system.md)
 - [Foundation and pairing implementation plan](docs/plans/foundation-and-pairing.md)
+- [Simplified four-step workflow plan](docs/plans/simple-four-step-workflow.md)
 - [Deployment and operations](docs/operations.md)
 - [Implementation status](docs/implementation-status.md)
 
@@ -159,4 +202,5 @@ cd web && npm install && npm test -- --run && npm run build
 - Objective metrics describe output properties, not final aesthetic preference.
 - Hardware specifications are evidence for attribution, not direct image-quality scores.
 - Cross-scene strategy claims require repeated support and retain counterexamples.
+- Quick-mode reports are operationally final but may still contain explicitly flagged unresolved review items.
 - Results apply to the submitted devices, firmware, shooting modes, people, and environments.
