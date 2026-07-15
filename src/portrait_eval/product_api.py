@@ -10,7 +10,8 @@ from fastapi import Depends, FastAPI, Header, HTTPException, Query
 from fastapi.responses import FileResponse, HTMLResponse
 from pydantic import BaseModel
 
-from portrait_eval.api import _adapter_set, create_app as create_base_app
+from portrait_eval.api import _adapter_set
+from portrait_eval.api import create_app as create_base_app
 from portrait_eval.config import Settings
 from portrait_eval.database import Database, ReportRow
 from portrait_eval.reporting import render_pdf_report
