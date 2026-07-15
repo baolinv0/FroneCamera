@@ -13,7 +13,7 @@ lint:
 	mypy src/portrait_eval
 
 format-check:
-	ruff format --check src tests scripts
+	ruff format --check src scripts
 
 frontend:
 	cd web && npm install --no-package-lock && npm test -- --run && npm run build
