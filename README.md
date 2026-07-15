@@ -182,7 +182,7 @@ External sources do not change the score of the submitted images. The reviewer e
 ```bash
 pytest -q
 ruff check src tests scripts
-ruff format --check src tests scripts
+ruff format --check src scripts
 mypy src/portrait_eval
 cd web && npm install && npm test -- --run && npm run build
 ```
