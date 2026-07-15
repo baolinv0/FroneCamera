@@ -1,0 +1,15 @@
+profile: generic_matched_scene_groups_v1
+minimum_devices: 2
+pairing:
+  proposal: natural_sort_position
+  explicit_missing_cells: true
+  confirmation_required: true
+  repeats_are_explicit_only: true
+analysis:
+  scene_taxonomy_required: false
+  strategy_minimum_supporting_scenes: 2
+  strategy_grade_a_minimum_scenes: 3
+  external_corroboration_after_internal_freeze: true
+metrics:
+  highlight_threshold: 0.98
+  deep_shadow_threshold: 0.02
