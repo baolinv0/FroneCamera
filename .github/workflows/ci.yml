@@ -14,9 +14,15 @@ jobs:
           python-version: "3.12"
       - run: python -m pip install -e ".[dev]"
       - run: pytest -q
-      - run: ruff check src tests scripts
-      - run: ruff format --check src tests scripts
-      - run: mypy src/portrait_eval
+      - run: ruff check src tests scripts 2>&1 | tee backend-ruff.log
+      - run: ruff format --check src tests scripts 2>&1 | tee backend-format.log
+      - run: mypy src/portrait_eval 2>&1 | tee backend-mypy.log
+      - name: Upload backend validation logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-validation-logs
+          path: backend-*.log
 
   frontend:
     runs-on: ubuntu-latest
@@ -29,5 +35,11 @@ jobs:
         with:
           node-version: "22"
       - run: npm install --no-package-lock
-      - run: npm test -- --run
-      - run: npm run build
+      - run: npm test -- --run 2>&1 | tee frontend-test.log
+      - run: npm run build 2>&1 | tee frontend-build.log
+      - name: Upload frontend validation logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-validation-logs
+          path: web/frontend-*.log
