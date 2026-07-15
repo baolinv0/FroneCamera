@@ -32,6 +32,22 @@ from portrait_eval.core.models_v2 import (
     SceneScoreStatus,
 )
 
+PERSISTENT_MODELS = (
+    EvaluationBatchV2,
+    MatchedSceneGroupV2,
+    ObjectiveEvidenceV2,
+    DimensionApplicabilityV2,
+    RoughRankingV2,
+    PairwiseComparisonV2,
+    FactCheckResultV2,
+    JudgeDecisionV2,
+    SceneDimensionScoreV2,
+    DeviceDimensionScoreV2,
+    DeviceOverallScoreV2,
+    MechanismInterpretationV2,
+    ReportEvidencePackageV2,
+)
+
 
 def make_batch() -> EvaluationBatchV2:
     return EvaluationBatchV2(
@@ -281,3 +297,46 @@ def test_remaining_contracts_construct_with_schema_version() -> None:
     )
     assert applicability.schema_version == ranking.schema_version == fact.schema_version == "2.0"
     assert make_pairwise().schema_version == make_judge().schema_version == "2.0"
+
+
+def test_every_persistent_contract_freezes_schema_version() -> None:
+    for model in PERSISTENT_MODELS:
+        assert model.model_fields["schema_version"].default == "2.0"
+
+
+def test_pairwise_contract_field_names_are_frozen() -> None:
+    assert set(PairwiseComparisonV2.model_fields) == {
+        "schema_version",
+        "comparison_id",
+        "scene_id",
+        "dimension_id",
+        "device_a_id",
+        "device_b_id",
+        "applicability",
+        "preference",
+        "strength",
+        "difference_type",
+        "confidence",
+        "observations",
+        "evidence_refs",
+        "style_axes",
+        "primary_model_version",
+        "prompt_version",
+    }
+
+
+def test_judge_contract_field_names_are_frozen() -> None:
+    assert set(JudgeDecisionV2.model_fields) == {
+        "schema_version",
+        "comparison_id",
+        "decision",
+        "accepted_preference",
+        "accepted_strength",
+        "accepted_difference_type",
+        "revised_observations",
+        "fact_conflicts",
+        "unsupported_attributions",
+        "confidence",
+        "judge_model_version",
+        "prompt_version",
+    }
