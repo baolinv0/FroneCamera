@@ -2,8 +2,8 @@ from pathlib import Path
 
 from fastapi.testclient import TestClient
 
-from portrait_eval.api import create_app
 from portrait_eval.config import Settings
+from portrait_eval.product_api import create_app
 
 
 def test_project_device_scan_pairing_flow(tmp_path: Path) -> None:
@@ -155,12 +155,18 @@ def test_run_full_evaluation_passes_selected_mode_to_pipeline(tmp_path: Path, mo
     client = TestClient(create_app(settings))
     called: dict[str, str] = {}
 
-    def fake_run(self, project_id: str, mode: str = "professional") -> dict[str, str]:  # type: ignore[no-untyped-def]
+    def fake_run(
+        session,
+        workspace,
+        project_id: str,
+        mode: str = "professional",
+        **kwargs,
+    ) -> dict[str, str]:  # type: ignore[no-untyped-def]
         called["project_id"] = project_id
         called["mode"] = mode
         return {"status": "REPORT_FINALIZED", "mode": mode}
 
-    monkeypatch.setattr("portrait_eval.api.EvaluationPipeline.run", fake_run)
+    monkeypatch.setattr("portrait_eval.product_api.run_evaluation_workflow", fake_run)
     response = client.post(
         "/api/projects/project-1/run-full-evaluation?sync=true",
         json={"mode": "quick"},
