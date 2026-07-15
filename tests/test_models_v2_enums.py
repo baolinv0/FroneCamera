@@ -1,4 +1,5 @@
 from portrait_eval.core.models_v2 import (
+    SCHEMA_VERSION,
     ApplicabilityStatus,
     ComparabilityStatus,
     DifferenceType,
@@ -11,7 +12,6 @@ from portrait_eval.core.models_v2 import (
     PairwisePreference,
     ReportAllowedLevel,
     ReportState,
-    SCHEMA_VERSION,
     SceneScoreStatus,
 )
 
