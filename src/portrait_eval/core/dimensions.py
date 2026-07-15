@@ -89,10 +89,7 @@ DIMENSIONS: tuple[DimensionDefinition, ...] = (
         evaluation_unit="face_gain_and_transition_behavior",
         scope=DimensionScope.SCENE,
         single_scene_applicable=True,
-        required_evidence=(
-            "face_background_relation_metrics",
-            "face_edge_transition_metrics",
-        ),
+        required_evidence=("face_background_relation_metrics", "face_edge_transition_metrics"),
     ),
     DimensionDefinition(
         id=DimensionId.MULTI_FACE_CONSISTENCY,
@@ -127,13 +124,9 @@ _dimension_ids = tuple(item.id for item in DIMENSIONS)
 if len(set(_dimension_ids)) != len(_dimension_ids):
     raise RuntimeError("Evaluation Core v2 dimension IDs must be unique")
 if set(_dimension_ids) != set(DimensionId):
-    raise RuntimeError(
-        "Evaluation Core v2 dimension registry must cover every frozen ID"
-    )
+    raise RuntimeError("Evaluation Core v2 dimension registry must cover every frozen ID")
 
-DIMENSION_BY_ID: dict[DimensionId, DimensionDefinition] = {
-    item.id: item for item in DIMENSIONS
-}
+DIMENSION_BY_ID: dict[DimensionId, DimensionDefinition] = {item.id: item for item in DIMENSIONS}
 TOTAL_DIMENSION_WEIGHT = sum(item.weight for item in DIMENSIONS)
 if abs(TOTAL_DIMENSION_WEIGHT - 1.0) > 1e-12:
     raise RuntimeError("Evaluation Core v2 dimension weights must sum to 1.0")
