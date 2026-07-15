@@ -1,6 +1,8 @@
 from datetime import UTC, datetime
 
 import pytest
+from pydantic import ValidationError
+
 from portrait_eval.core.models_v2 import (
     ApplicabilityStatus,
     ComparabilityStatus,
@@ -29,7 +31,6 @@ from portrait_eval.core.models_v2 import (
     SceneDimensionScoreV2,
     SceneScoreStatus,
 )
-from pydantic import ValidationError
 
 
 def make_batch() -> EvaluationBatchV2:
