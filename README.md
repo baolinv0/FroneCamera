@@ -4,5 +4,9 @@ Front-camera portrait evaluation system for cross-device image comparison, evide
 
 ## Documents
 
-- `docs/superpowers/specs/2026-07-14-front-camera-portrait-evaluation-system-design.md`
-- `docs/superpowers/plans/2026-07-15-foundation-and-pairing-implementation.md`
+- [Approved design specification](docs/design/front-camera-portrait-evaluation-system.md)
+- [Foundation and pairing implementation plan](docs/plans/foundation-and-pairing.md)
+
+## Current Phase
+
+The repository contains the approved system design and the first implementation plan. The first executable slice covers project creation, device-folder registration, deterministic pairing proposals, manual correction, immutable pairing snapshots, persistence, API endpoints, and a browser review console.
