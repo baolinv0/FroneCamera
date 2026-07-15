@@ -148,3 +148,61 @@ def test_finalize_regenerates_bundle_and_applies_rejected_attribution_review(tmp
     document = final_json.read_text(encoding="utf-8")
     assert "Observable finding" in document
     assert "Mechanism hypothesis" not in document
+
+
+def test_run_full_evaluation_passes_selected_mode_to_pipeline(tmp_path: Path, monkeypatch) -> None:
+    settings = Settings(database_url=f"sqlite:///{tmp_path / 'workflow.db'}", workspace=tmp_path / "workspace")
+    client = TestClient(create_app(settings))
+    called: dict[str, str] = {}
+
+    def fake_run(self, project_id: str, mode: str = "professional") -> dict[str, str]:  # type: ignore[no-untyped-def]
+        called["project_id"] = project_id
+        called["mode"] = mode
+        return {"status": "REPORT_FINALIZED", "mode": mode}
+
+    monkeypatch.setattr("portrait_eval.api.EvaluationPipeline.run", fake_run)
+    response = client.post(
+        "/api/projects/project-1/run-full-evaluation?sync=true",
+        json={"mode": "quick"},
+    )
+    assert response.status_code == 200
+    assert response.json()["mode"] == "quick"
+    assert called == {"project_id": "project-1", "mode": "quick"}
+
+
+def test_read_only_report_share_url_uses_signed_token(tmp_path: Path) -> None:
+    settings = Settings(
+        database_url=f"sqlite:///{tmp_path / 'share.db'}",
+        workspace=tmp_path / "workspace",
+        api_token="admin-token",
+        report_share_secret="test-share-secret",
+    )
+    settings.prepare()
+    client = TestClient(create_app(settings))
+    project = client.post(
+        "/api/projects",
+        json={"name": "share"},
+        headers={"Authorization": "Bearer admin-token"},
+    ).json()
+    html_path = settings.workspace / "projects" / project["id"] / "reports" / "final-v1.0.html"
+    html_path.parent.mkdir(parents=True)
+    html_path.write_text("<h1>shared-report</h1>", encoding="utf-8")
+    from portrait_eval.database import Database
+    from portrait_eval.repository import Repository
+
+    database = Database(settings.database_url)
+    with database.session_factory() as session:
+        report = Repository(session).save_report(project["id"], "1.0", "final", str(html_path))
+
+    share = client.post(
+        f"/api/reports/{report.id}/share",
+        headers={"Authorization": "Bearer admin-token"},
+    )
+    assert share.status_code == 200
+    public_url = share.json()["url"]
+    assert public_url.startswith(f"/reports/{report.id}?token=")
+    assert client.get(f"/reports/{report.id}?token=invalid").status_code == 403
+    public = client.get(public_url)
+    assert public.status_code == 200
+    assert b"shared-report" in public.content
+    assert public.headers["content-type"].startswith("text/html")
