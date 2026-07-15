@@ -9,8 +9,8 @@ from portrait_eval.core.dimensions import (
 from portrait_eval.core.models_v2 import SCHEMA_VERSION, DimensionId
 
 __all__ = [
-    "DIMENSION_BY_ID",
     "DIMENSIONS",
+    "DIMENSION_BY_ID",
     "SCHEMA_VERSION",
     "TOTAL_DIMENSION_WEIGHT",
     "DimensionDefinition",
