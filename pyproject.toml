@@ -69,3 +69,6 @@ disallow_untyped_decorators = false
 warn_return_any = false
 allow_subclassing_any = true
 
+[[tool.mypy.overrides]]
+module = "portrait_eval.imaging"
+disable_error_code = ["attr-defined"]
