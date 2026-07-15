@@ -112,6 +112,14 @@ def test_batch_defaults_and_round_trip() -> None:
     assert EvaluationBatchV2.model_validate_json(batch.model_dump_json()) == batch
 
 
+def test_batch_requires_two_distinct_devices() -> None:
+    payload = make_batch().model_dump()
+    with pytest.raises(ValidationError, match="at least 2 items"):
+        EvaluationBatchV2.model_validate({**payload, "device_ids": ["a"]})
+    with pytest.raises(ValidationError, match="device IDs must be unique"):
+        EvaluationBatchV2.model_validate({**payload, "device_ids": ["a", "a"]})
+
+
 def test_unknown_fields_are_rejected() -> None:
     payload = make_batch().model_dump()
     payload["unknown"] = True
@@ -198,6 +206,56 @@ def test_score_and_objective_adjustment_bounds_are_enforced() -> None:
         SceneDimensionScoreV2.model_validate({**base, "normalized_score": 101})
     with pytest.raises(ValidationError):
         SceneDimensionScoreV2.model_validate({**base, "objective_adjustment": 5.1})
+
+
+def test_not_applicable_scene_score_has_no_numeric_quality() -> None:
+    score = SceneDimensionScoreV2(
+        scene_id="scene-001",
+        dimension_id=DimensionId.MULTI_FACE_CONSISTENCY,
+        device_id="a",
+        latent_quality=None,
+        normalized_score=None,
+        confidence=0.9,
+        diagnostic_weight=0.0,
+        objective_adjustment=None,
+        final_score=None,
+        status=SceneScoreStatus.NOT_APPLICABLE,
+        contributing_comparison_ids=[],
+    )
+    assert score.normalized_score is None
+    assert score.final_score is None
+
+    with pytest.raises(ValidationError, match="must not carry numeric quality"):
+        SceneDimensionScoreV2(
+            scene_id="scene-001",
+            dimension_id=DimensionId.MULTI_FACE_CONSISTENCY,
+            device_id="a",
+            latent_quality=0.0,
+            normalized_score=0.0,
+            confidence=0.9,
+            diagnostic_weight=0.0,
+            objective_adjustment=0.0,
+            final_score=0.0,
+            status=SceneScoreStatus.NOT_APPLICABLE,
+            contributing_comparison_ids=[],
+        )
+
+
+def test_scored_scene_status_requires_complete_numeric_quality() -> None:
+    with pytest.raises(ValidationError, match="requires complete numeric quality"):
+        SceneDimensionScoreV2(
+            scene_id="scene-001",
+            dimension_id=DimensionId.FACE_EXPOSURE_READABILITY,
+            device_id="a",
+            latent_quality=None,
+            normalized_score=None,
+            confidence=0.9,
+            diagnostic_weight=0.8,
+            objective_adjustment=None,
+            final_score=None,
+            status=SceneScoreStatus.AUTO_PASS,
+            contributing_comparison_ids=["cmp-001"],
+        )
 
 
 def test_pairwise_preference_strength_and_devices_are_consistent() -> None:
