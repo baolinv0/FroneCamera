@@ -1,4 +1,5 @@
 import { render, screen } from '@testing-library/react'
+import { expect, test } from 'vitest'
 import { WorkflowSteps } from './WorkflowSteps'
 
 test('shows the four user-facing workflow steps', () => {
