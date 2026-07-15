@@ -1,4 +1,4 @@
-import type { AnalysisRecord, Pairing, PairingSnapshot, Project, ReportRecord, ReviewItem, Task } from './types'
+import type { AnalysisRecord, EvaluationMode, Pairing, PairingSnapshot, Project, ReportRecord, ReportShare, ReviewItem, Task } from './types'
 
 const token = () => localStorage.getItem('fronecamera-token') || ''
 
@@ -22,10 +22,12 @@ export const api = {
   updatePairing: (projectId: string, body: { expected_version: number; group_id: string; device_id: string; image_id: string | null }) => request<Pairing>(`/api/projects/${projectId}/pairing`, { method: 'PUT', body: JSON.stringify(body) }),
   confirm: (projectId: string, expectedVersion: number) => request<Pairing>(`/api/projects/${projectId}/pairing/confirm`, { method: 'POST', body: JSON.stringify({ expected_version: expectedVersion }) }),
   run: (projectId: string) => request<Task>(`/api/projects/${projectId}/run`, { method: 'POST' }),
+  runFullEvaluation: (projectId: string, mode: EvaluationMode) => request<Task>(`/api/projects/${projectId}/run-full-evaluation`, { method: 'POST', body: JSON.stringify({ mode }) }),
   task: (taskId: string) => request<Task>(`/api/tasks/${taskId}`),
   analysis: (projectId: string, kind?: string) => request<AnalysisRecord[]>(`/api/projects/${projectId}/analysis${kind ? `?kind=${encodeURIComponent(kind)}` : ''}`),
   reviews: (projectId: string) => request<ReviewItem[]>(`/api/projects/${projectId}/review-items`),
   resolveReview: (reviewId: string, status: string, note?: string) => request(`/api/review-items/${reviewId}`, { method: 'PATCH', body: JSON.stringify({ status, note }) }),
   reports: (projectId: string) => request<ReportRecord[]>(`/api/projects/${projectId}/reports`),
-  finalizeReport: (projectId: string) => request<ReportRecord>(`/api/projects/${projectId}/reports/finalize`, { method: 'POST' })
+  finalizeReport: (projectId: string) => request<ReportRecord>(`/api/projects/${projectId}/reports/finalize`, { method: 'POST' }),
+  shareReport: (reportId: string) => request<ReportShare>(`/api/reports/${reportId}/share`, { method: 'POST' })
 }
