@@ -1,3 +1,3 @@
-from portrait_eval.core.models_v2 import DimensionId, SCHEMA_VERSION
+from portrait_eval.core.models_v2 import SCHEMA_VERSION, DimensionId
 
-__all__ = ["DimensionId", "SCHEMA_VERSION"]
+__all__ = ["SCHEMA_VERSION", "DimensionId"]
