@@ -55,9 +55,7 @@ class V2Repository:
             raise KeyError(batch_id)
         return EvaluationBatchV2.model_validate_json(row.payload_json)
 
-    def save_matched_scene_group(
-        self, group: MatchedSceneGroupV2
-    ) -> MatchedSceneGroupV2:
+    def save_matched_scene_group(self, group: MatchedSceneGroupV2) -> MatchedSceneGroupV2:
         self._require_batch(group.batch_id)
         key = (group.batch_id, group.scene_id)
         if self.session.get(MatchedSceneGroupRowV2, key) is not None:
@@ -76,9 +74,7 @@ class V2Repository:
         self.session.commit()
         return group
 
-    def get_matched_scene_group(
-        self, batch_id: str, scene_id: str
-    ) -> MatchedSceneGroupV2:
+    def get_matched_scene_group(self, batch_id: str, scene_id: str) -> MatchedSceneGroupV2:
         row = self.session.get(MatchedSceneGroupRowV2, (batch_id, scene_id))
         if row is None:
             raise KeyError((batch_id, scene_id))
@@ -104,9 +100,7 @@ class V2Repository:
         self.session.commit()
         return evidence
 
-    def get_objective_evidence(
-        self, batch_id: str, image_id: str
-    ) -> ObjectiveEvidenceV2:
+    def get_objective_evidence(self, batch_id: str, image_id: str) -> ObjectiveEvidenceV2:
         row = self.session.get(ObjectiveEvidenceRowV2, (batch_id, image_id))
         if row is None:
             raise KeyError((batch_id, image_id))
@@ -149,9 +143,7 @@ class V2Repository:
             raise KeyError((batch_id, scene_id, dimension_id.value))
         return DimensionApplicabilityV2.model_validate_json(row.payload_json)
 
-    def save_rough_ranking(
-        self, batch_id: str, ranking: RoughRankingV2
-    ) -> RoughRankingV2:
+    def save_rough_ranking(self, batch_id: str, ranking: RoughRankingV2) -> RoughRankingV2:
         self._require_batch(batch_id)
         key = (batch_id, ranking.scene_id, ranking.dimension_id.value)
         if self.session.get(RoughRankingRowV2, key) is not None:
