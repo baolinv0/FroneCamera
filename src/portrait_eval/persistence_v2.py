@@ -194,3 +194,84 @@ class JudgeDecisionAttemptRowV2(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=_stored_at, index=True
     )
+
+
+class SceneDimensionScoreRowV2(Base):
+    __tablename__ = "scene_dimension_scores_v2"
+
+    batch_id: Mapped[str] = mapped_column(
+        ForeignKey("evaluation_batches_v2.batch_id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    scene_id: Mapped[str] = mapped_column(String, primary_key=True)
+    dimension_id: Mapped[str] = mapped_column(String, primary_key=True)
+    device_id: Mapped[str] = mapped_column(String, primary_key=True)
+    schema_version: Mapped[str] = mapped_column(String(20))
+    status: Mapped[str] = mapped_column(String(50), index=True)
+    accepted_judge_attempt_ids_json: Mapped[str] = mapped_column(Text, default="[]")
+    payload_json: Mapped[str] = mapped_column(Text)
+    stored_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_stored_at, index=True
+    )
+
+
+class DeviceDimensionScoreRowV2(Base):
+    __tablename__ = "device_dimension_scores_v2"
+
+    batch_id: Mapped[str] = mapped_column(
+        ForeignKey("evaluation_batches_v2.batch_id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    device_id: Mapped[str] = mapped_column(String, primary_key=True)
+    dimension_id: Mapped[str] = mapped_column(String, primary_key=True)
+    schema_version: Mapped[str] = mapped_column(String(20))
+    payload_json: Mapped[str] = mapped_column(Text)
+    stored_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_stored_at, index=True
+    )
+
+
+class DeviceOverallScoreRowV2(Base):
+    __tablename__ = "device_overall_scores_v2"
+
+    batch_id: Mapped[str] = mapped_column(
+        ForeignKey("evaluation_batches_v2.batch_id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    device_id: Mapped[str] = mapped_column(String, primary_key=True)
+    schema_version: Mapped[str] = mapped_column(String(20))
+    payload_json: Mapped[str] = mapped_column(Text)
+    stored_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_stored_at, index=True
+    )
+
+
+class MechanismInterpretationRowV2(Base):
+    __tablename__ = "mechanism_interpretations_v2"
+
+    batch_id: Mapped[str] = mapped_column(
+        ForeignKey("evaluation_batches_v2.batch_id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    interpretation_id: Mapped[str] = mapped_column(String, primary_key=True)
+    device_id: Mapped[str] = mapped_column(String, index=True)
+    schema_version: Mapped[str] = mapped_column(String(20))
+    attribution: Mapped[str] = mapped_column(String(50), index=True)
+    payload_json: Mapped[str] = mapped_column(Text)
+    stored_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_stored_at, index=True
+    )
+
+
+class ReportEvidencePackageRowV2(Base):
+    __tablename__ = "report_evidence_packages_v2"
+
+    package_id: Mapped[str] = mapped_column(String, primary_key=True)
+    batch_id: Mapped[str] = mapped_column(
+        ForeignKey("evaluation_batches_v2.batch_id", ondelete="CASCADE"), index=True
+    )
+    schema_version: Mapped[str] = mapped_column(String(20))
+    payload_json: Mapped[str] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_stored_at, index=True
+    )
