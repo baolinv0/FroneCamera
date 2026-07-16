@@ -691,32 +691,39 @@ class V2Repository:
         self._require_batch(batch_id)
         if self.get_evaluation_batch(batch_id) != package.batch:
             raise ValueError("report package batch does not match persisted batch")
-        for expected in package.device_dimension_scores:
-            key = (batch_id, expected.device_id, expected.dimension_id.value)
-            row = self.session.get(DeviceDimensionScoreRowV2, key)
+        for dimension_score in package.device_dimension_scores:
+            dimension_key = (
+                batch_id,
+                dimension_score.device_id,
+                dimension_score.dimension_id.value,
+            )
+            dimension_row = self.session.get(DeviceDimensionScoreRowV2, dimension_key)
             if (
-                row is None
-                or DeviceDimensionScoreV2.model_validate_json(row.payload_json) != expected
+                dimension_row is None
+                or DeviceDimensionScoreV2.model_validate_json(dimension_row.payload_json)
+                != dimension_score
             ):
                 raise ValueError("report package references unpersisted device dimension score")
-        for expected in package.device_overall_scores:
-            row = self.session.get(
+        for overall_score in package.device_overall_scores:
+            overall_row = self.session.get(
                 DeviceOverallScoreRowV2,
-                (batch_id, expected.device_id),
+                (batch_id, overall_score.device_id),
             )
             if (
-                row is None
-                or DeviceOverallScoreV2.model_validate_json(row.payload_json) != expected
+                overall_row is None
+                or DeviceOverallScoreV2.model_validate_json(overall_row.payload_json)
+                != overall_score
             ):
                 raise ValueError("report package references unpersisted device overall score")
-        for expected in package.mechanism_interpretations:
-            row = self.session.get(
+        for mechanism in package.mechanism_interpretations:
+            mechanism_row = self.session.get(
                 MechanismInterpretationRowV2,
-                (batch_id, expected.interpretation_id),
+                (batch_id, mechanism.interpretation_id),
             )
             if (
-                row is None
-                or MechanismInterpretationV2.model_validate_json(row.payload_json) != expected
+                mechanism_row is None
+                or MechanismInterpretationV2.model_validate_json(mechanism_row.payload_json)
+                != mechanism
             ):
                 raise ValueError("report package references unpersisted mechanism interpretation")
         self.session.add(
