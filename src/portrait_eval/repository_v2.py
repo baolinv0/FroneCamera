@@ -591,14 +591,10 @@ class V2Repository:
         return StoredSceneDimensionScore(
             batch_id=batch_id,
             score=SceneDimensionScoreV2.model_validate_json(row.payload_json),
-            accepted_judge_attempt_ids=_decode_string_tuple(
-                row.accepted_judge_attempt_ids_json
-            ),
+            accepted_judge_attempt_ids=_decode_string_tuple(row.accepted_judge_attempt_ids_json),
         )
 
-    def save_device_dimension_score(
-        self, score: DeviceDimensionScoreV2
-    ) -> DeviceDimensionScoreV2:
+    def save_device_dimension_score(self, score: DeviceDimensionScoreV2) -> DeviceDimensionScoreV2:
         self._require_batch(score.batch_id)
         key = (score.batch_id, score.device_id, score.dimension_id.value)
         if self.session.get(DeviceDimensionScoreRowV2, key) is not None:
@@ -629,9 +625,7 @@ class V2Repository:
             raise KeyError((batch_id, device_id, dimension_id.value))
         return DeviceDimensionScoreV2.model_validate_json(row.payload_json)
 
-    def save_device_overall_score(
-        self, score: DeviceOverallScoreV2
-    ) -> DeviceOverallScoreV2:
+    def save_device_overall_score(self, score: DeviceOverallScoreV2) -> DeviceOverallScoreV2:
         self._require_batch(score.batch_id)
         key = (score.batch_id, score.device_id)
         if self.session.get(DeviceOverallScoreRowV2, key) is not None:
@@ -647,9 +641,7 @@ class V2Repository:
         self.session.commit()
         return score
 
-    def get_device_overall_score(
-        self, batch_id: str, device_id: str
-    ) -> DeviceOverallScoreV2:
+    def get_device_overall_score(self, batch_id: str, device_id: str) -> DeviceOverallScoreV2:
         row = self.session.get(DeviceOverallScoreRowV2, (batch_id, device_id))
         if row is None:
             raise KeyError((batch_id, device_id))
@@ -702,34 +694,31 @@ class V2Repository:
         for expected in package.device_dimension_scores:
             key = (batch_id, expected.device_id, expected.dimension_id.value)
             row = self.session.get(DeviceDimensionScoreRowV2, key)
-            if row is None or DeviceDimensionScoreV2.model_validate_json(
-                row.payload_json
-            ) != expected:
-                raise ValueError(
-                    "report package references unpersisted device dimension score"
-                )
+            if (
+                row is None
+                or DeviceDimensionScoreV2.model_validate_json(row.payload_json) != expected
+            ):
+                raise ValueError("report package references unpersisted device dimension score")
         for expected in package.device_overall_scores:
             row = self.session.get(
                 DeviceOverallScoreRowV2,
                 (batch_id, expected.device_id),
             )
-            if row is None or DeviceOverallScoreV2.model_validate_json(
-                row.payload_json
-            ) != expected:
-                raise ValueError(
-                    "report package references unpersisted device overall score"
-                )
+            if (
+                row is None
+                or DeviceOverallScoreV2.model_validate_json(row.payload_json) != expected
+            ):
+                raise ValueError("report package references unpersisted device overall score")
         for expected in package.mechanism_interpretations:
             row = self.session.get(
                 MechanismInterpretationRowV2,
                 (batch_id, expected.interpretation_id),
             )
-            if row is None or MechanismInterpretationV2.model_validate_json(
-                row.payload_json
-            ) != expected:
-                raise ValueError(
-                    "report package references unpersisted mechanism interpretation"
-                )
+            if (
+                row is None
+                or MechanismInterpretationV2.model_validate_json(row.payload_json) != expected
+            ):
+                raise ValueError("report package references unpersisted mechanism interpretation")
         self.session.add(
             ReportEvidencePackageRowV2(
                 package_id=package_id,
