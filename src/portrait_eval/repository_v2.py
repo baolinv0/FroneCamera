@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass
 from datetime import datetime
 from uuid import uuid4
@@ -8,26 +9,38 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from portrait_eval.core.models_v2 import (
+    DeviceDimensionScoreV2,
+    DeviceOverallScoreV2,
     DimensionApplicabilityV2,
     DimensionId,
     EvaluationBatchV2,
     FactCheckResultV2,
+    JudgeDecisionType,
     JudgeDecisionV2,
     MatchedSceneGroupV2,
+    MechanismInterpretationV2,
     ObjectiveEvidenceV2,
     PairwiseComparisonV2,
+    ReportEvidencePackageV2,
     RoughRankingV2,
+    SceneDimensionScoreV2,
+    SceneScoreStatus,
 )
 from portrait_eval.database import ProjectRow
 from portrait_eval.persistence_v2 import (
+    DeviceDimensionScoreRowV2,
+    DeviceOverallScoreRowV2,
     DimensionApplicabilityRowV2,
     EvaluationBatchRowV2,
     FactCheckAttemptRowV2,
     JudgeDecisionAttemptRowV2,
     MatchedSceneGroupRowV2,
+    MechanismInterpretationRowV2,
     ObjectiveEvidenceRowV2,
     PairwiseComparisonAttemptRowV2,
+    ReportEvidencePackageRowV2,
     RoughRankingRowV2,
+    SceneDimensionScoreRowV2,
 )
 
 
@@ -41,6 +54,20 @@ class StoredAttempt[AttemptPayloadT]:
     source_attempt_ids: tuple[str, ...]
     payload: AttemptPayloadT
     created_at: datetime
+
+
+@dataclass(frozen=True, slots=True)
+class StoredSceneDimensionScore:
+    batch_id: str
+    score: SceneDimensionScoreV2
+    accepted_judge_attempt_ids: tuple[str, ...]
+
+
+def _decode_string_tuple(value: str) -> tuple[str, ...]:
+    raw: object = json.loads(value)
+    if not isinstance(raw, list) or not all(isinstance(item, str) for item in raw):
+        raise ValueError("stored string-list payload is invalid")
+    return tuple(raw)
 
 
 class V2Repository:
@@ -74,7 +101,6 @@ class V2Repository:
             raise KeyError(batch.project_id)
         if self.session.get(EvaluationBatchRowV2, batch.batch_id) is not None:
             raise ValueError("batch already exists")
-
         self.session.add(
             EvaluationBatchRowV2(
                 batch_id=batch.batch_id,
@@ -101,7 +127,6 @@ class V2Repository:
         key = (group.batch_id, group.scene_id)
         if self.session.get(MatchedSceneGroupRowV2, key) is not None:
             raise ValueError("matched scene group already exists")
-
         self.session.add(
             MatchedSceneGroupRowV2(
                 batch_id=group.batch_id,
@@ -128,7 +153,6 @@ class V2Repository:
         key = (batch_id, evidence.image_id)
         if self.session.get(ObjectiveEvidenceRowV2, key) is not None:
             raise ValueError("objective evidence already exists")
-
         self.session.add(
             ObjectiveEvidenceRowV2(
                 batch_id=batch_id,
@@ -156,7 +180,6 @@ class V2Repository:
         key = (batch_id, applicability.scene_id, applicability.dimension_id.value)
         if self.session.get(DimensionApplicabilityRowV2, key) is not None:
             raise ValueError("dimension applicability already exists")
-
         self.session.add(
             DimensionApplicabilityRowV2(
                 batch_id=batch_id,
@@ -189,7 +212,6 @@ class V2Repository:
         key = (batch_id, ranking.scene_id, ranking.dimension_id.value)
         if self.session.get(RoughRankingRowV2, key) is not None:
             raise ValueError("rough ranking already exists")
-
         self.session.add(
             RoughRankingRowV2(
                 batch_id=batch_id,
@@ -345,7 +367,6 @@ class V2Repository:
             raise KeyError(source_pairwise_attempt_id)
         if source.batch_id != batch_id or source.comparison_id != result.comparison_id:
             raise ValueError("source pairwise attempt does not match comparison")
-
         latest = self._latest_fact_check_row(batch_id, result.comparison_id)
         attempt_number = self._next_attempt_number(
             latest.attempt_id if latest is not None else None,
@@ -440,7 +461,6 @@ class V2Repository:
             raise KeyError(source_pairwise_attempt_id)
         if pairwise.batch_id != batch_id or pairwise.comparison_id != decision.comparison_id:
             raise ValueError("source pairwise attempt does not match comparison")
-
         fact_check = self.session.get(FactCheckAttemptRowV2, source_fact_check_attempt_id)
         if fact_check is None:
             raise KeyError(source_fact_check_attempt_id)
@@ -448,7 +468,6 @@ class V2Repository:
             raise ValueError("source fact-check attempt does not match comparison")
         if fact_check.source_pairwise_attempt_id != source_pairwise_attempt_id:
             raise ValueError("fact-check lineage does not match pairwise attempt")
-
         latest = self._latest_judge_row(batch_id, decision.comparison_id)
         attempt_number = self._next_attempt_number(
             latest.attempt_id if latest is not None else None,
@@ -499,3 +518,231 @@ class V2Repository:
         if row is None:
             raise KeyError((batch_id, comparison_id))
         return self._stored_judge(row)
+
+    def save_scene_dimension_score(
+        self,
+        batch_id: str,
+        score: SceneDimensionScoreV2,
+        *,
+        accepted_judge_attempt_ids: list[str] | tuple[str, ...] = (),
+    ) -> StoredSceneDimensionScore:
+        self._require_batch(batch_id)
+        judge_ids = tuple(accepted_judge_attempt_ids)
+        if len(set(judge_ids)) != len(judge_ids):
+            raise ValueError("duplicate judge attempt ID")
+        if score.status is SceneScoreStatus.NOT_APPLICABLE and judge_ids:
+            raise ValueError("NOT_APPLICABLE cannot reference judge attempts")
+        contribution_ids = set(score.contributing_comparison_ids)
+        accepted_comparison_ids: list[str] = []
+        for attempt_id in judge_ids:
+            row = self.session.get(JudgeDecisionAttemptRowV2, attempt_id)
+            if row is None:
+                raise KeyError(attempt_id)
+            if row.batch_id != batch_id:
+                raise ValueError("judge attempt does not match batch")
+            decision = JudgeDecisionV2.model_validate_json(row.payload_json)
+            if decision.decision not in {
+                JudgeDecisionType.ACCEPT,
+                JudgeDecisionType.REVISE,
+            }:
+                raise ValueError("judge attempt is not accepted")
+            if row.comparison_id not in contribution_ids:
+                raise ValueError("judge attempt does not match contributing comparison")
+            accepted_comparison_ids.append(row.comparison_id)
+        if set(accepted_comparison_ids) != contribution_ids:
+            raise ValueError("accepted judge attempts must cover contributing comparisons")
+        if len(accepted_comparison_ids) != len(set(accepted_comparison_ids)):
+            raise ValueError("multiple judge attempts reference one contributing comparison")
+        key = (batch_id, score.scene_id, score.dimension_id.value, score.device_id)
+        if self.session.get(SceneDimensionScoreRowV2, key) is not None:
+            raise ValueError("scene dimension score already exists")
+        self.session.add(
+            SceneDimensionScoreRowV2(
+                batch_id=batch_id,
+                scene_id=score.scene_id,
+                dimension_id=score.dimension_id.value,
+                device_id=score.device_id,
+                schema_version=score.schema_version,
+                status=score.status.value,
+                accepted_judge_attempt_ids_json=json.dumps(judge_ids),
+                payload_json=score.model_dump_json(),
+            )
+        )
+        self.session.commit()
+        return StoredSceneDimensionScore(
+            batch_id=batch_id,
+            score=score,
+            accepted_judge_attempt_ids=judge_ids,
+        )
+
+    def get_scene_dimension_score(
+        self,
+        batch_id: str,
+        scene_id: str,
+        dimension_id: DimensionId,
+        device_id: str,
+    ) -> StoredSceneDimensionScore:
+        row = self.session.get(
+            SceneDimensionScoreRowV2,
+            (batch_id, scene_id, dimension_id.value, device_id),
+        )
+        if row is None:
+            raise KeyError((batch_id, scene_id, dimension_id.value, device_id))
+        return StoredSceneDimensionScore(
+            batch_id=batch_id,
+            score=SceneDimensionScoreV2.model_validate_json(row.payload_json),
+            accepted_judge_attempt_ids=_decode_string_tuple(
+                row.accepted_judge_attempt_ids_json
+            ),
+        )
+
+    def save_device_dimension_score(
+        self, score: DeviceDimensionScoreV2
+    ) -> DeviceDimensionScoreV2:
+        self._require_batch(score.batch_id)
+        key = (score.batch_id, score.device_id, score.dimension_id.value)
+        if self.session.get(DeviceDimensionScoreRowV2, key) is not None:
+            raise ValueError("device dimension score already exists")
+        self.session.add(
+            DeviceDimensionScoreRowV2(
+                batch_id=score.batch_id,
+                device_id=score.device_id,
+                dimension_id=score.dimension_id.value,
+                schema_version=score.schema_version,
+                payload_json=score.model_dump_json(),
+            )
+        )
+        self.session.commit()
+        return score
+
+    def get_device_dimension_score(
+        self,
+        batch_id: str,
+        device_id: str,
+        dimension_id: DimensionId,
+    ) -> DeviceDimensionScoreV2:
+        row = self.session.get(
+            DeviceDimensionScoreRowV2,
+            (batch_id, device_id, dimension_id.value),
+        )
+        if row is None:
+            raise KeyError((batch_id, device_id, dimension_id.value))
+        return DeviceDimensionScoreV2.model_validate_json(row.payload_json)
+
+    def save_device_overall_score(
+        self, score: DeviceOverallScoreV2
+    ) -> DeviceOverallScoreV2:
+        self._require_batch(score.batch_id)
+        key = (score.batch_id, score.device_id)
+        if self.session.get(DeviceOverallScoreRowV2, key) is not None:
+            raise ValueError("device overall score already exists")
+        self.session.add(
+            DeviceOverallScoreRowV2(
+                batch_id=score.batch_id,
+                device_id=score.device_id,
+                schema_version=score.schema_version,
+                payload_json=score.model_dump_json(),
+            )
+        )
+        self.session.commit()
+        return score
+
+    def get_device_overall_score(
+        self, batch_id: str, device_id: str
+    ) -> DeviceOverallScoreV2:
+        row = self.session.get(DeviceOverallScoreRowV2, (batch_id, device_id))
+        if row is None:
+            raise KeyError((batch_id, device_id))
+        return DeviceOverallScoreV2.model_validate_json(row.payload_json)
+
+    def save_mechanism_interpretation(
+        self,
+        batch_id: str,
+        interpretation: MechanismInterpretationV2,
+    ) -> MechanismInterpretationV2:
+        self._require_batch(batch_id)
+        key = (batch_id, interpretation.interpretation_id)
+        if self.session.get(MechanismInterpretationRowV2, key) is not None:
+            raise ValueError("mechanism interpretation already exists")
+        self.session.add(
+            MechanismInterpretationRowV2(
+                batch_id=batch_id,
+                interpretation_id=interpretation.interpretation_id,
+                device_id=interpretation.device_id,
+                schema_version=interpretation.schema_version,
+                attribution=interpretation.attribution.value,
+                payload_json=interpretation.model_dump_json(),
+            )
+        )
+        self.session.commit()
+        return interpretation
+
+    def get_mechanism_interpretation(
+        self, batch_id: str, interpretation_id: str
+    ) -> MechanismInterpretationV2:
+        row = self.session.get(
+            MechanismInterpretationRowV2,
+            (batch_id, interpretation_id),
+        )
+        if row is None:
+            raise KeyError((batch_id, interpretation_id))
+        return MechanismInterpretationV2.model_validate_json(row.payload_json)
+
+    def save_report_evidence_package(
+        self,
+        package_id: str,
+        package: ReportEvidencePackageV2,
+    ) -> ReportEvidencePackageV2:
+        if self.session.get(ReportEvidencePackageRowV2, package_id) is not None:
+            raise ValueError("report evidence package already exists")
+        batch_id = package.batch.batch_id
+        self._require_batch(batch_id)
+        if self.get_evaluation_batch(batch_id) != package.batch:
+            raise ValueError("report package batch does not match persisted batch")
+        for expected in package.device_dimension_scores:
+            key = (batch_id, expected.device_id, expected.dimension_id.value)
+            row = self.session.get(DeviceDimensionScoreRowV2, key)
+            if row is None or DeviceDimensionScoreV2.model_validate_json(
+                row.payload_json
+            ) != expected:
+                raise ValueError(
+                    "report package references unpersisted device dimension score"
+                )
+        for expected in package.device_overall_scores:
+            row = self.session.get(
+                DeviceOverallScoreRowV2,
+                (batch_id, expected.device_id),
+            )
+            if row is None or DeviceOverallScoreV2.model_validate_json(
+                row.payload_json
+            ) != expected:
+                raise ValueError(
+                    "report package references unpersisted device overall score"
+                )
+        for expected in package.mechanism_interpretations:
+            row = self.session.get(
+                MechanismInterpretationRowV2,
+                (batch_id, expected.interpretation_id),
+            )
+            if row is None or MechanismInterpretationV2.model_validate_json(
+                row.payload_json
+            ) != expected:
+                raise ValueError(
+                    "report package references unpersisted mechanism interpretation"
+                )
+        self.session.add(
+            ReportEvidencePackageRowV2(
+                package_id=package_id,
+                batch_id=batch_id,
+                schema_version=package.schema_version,
+                payload_json=package.model_dump_json(),
+            )
+        )
+        self.session.commit()
+        return package
+
+    def get_report_evidence_package(self, package_id: str) -> ReportEvidencePackageV2:
+        row = self.session.get(ReportEvidencePackageRowV2, package_id)
+        if row is None:
+            raise KeyError(package_id)
+        return ReportEvidencePackageV2.model_validate_json(row.payload_json)
