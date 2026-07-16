@@ -193,6 +193,8 @@ class Database:
         self.session_factory = sessionmaker(self.engine, expire_on_commit=False)
 
     def create_all(self) -> None:
+        from portrait_eval import persistence_v2 as _persistence_v2  # noqa: F401
+
         Base.metadata.create_all(self.engine)
 
     def session(self) -> Iterator[Session]:
