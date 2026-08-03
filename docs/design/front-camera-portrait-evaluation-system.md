@@ -1,339 +1,191 @@
-# Front-Camera Portrait Evaluation System
+# Front-Camera Portrait Evaluation System — Current Design Specification
 
-## Status
+**Status:** approved and implemented as v0.1 MVP
+**Deployment:** local Linux server, Windows browser client
+**Data:** original photographs remain local and read-only
 
-Approved product and architecture specification for a local, single-user front-camera portrait comparison system.
+## 1. Problem statement
 
-## 1. Goal
+The system compares front-camera portrait outputs from `N >= 2` phones in matched real-world scenes. The current data may contain only several scenes, scene labels may be unknown, filenames may differ, and one or more devices may be missing a capture.
 
-Evaluate portrait photos captured by multiple phones in matched real-world scenes, reduce bias caused by capture variation, distinguish observable image behavior from mechanism hypotheses, and generate traceable HTML/PDF reports.
-
-The system must not assume that the input follows a fixed 20-scene protocol. Existing data may contain only several matched scenes from different brands, with unknown or incomplete scene labels.
-
-## 2. Input Contract
-
-- Accept `N >= 2` device folders.
-- Filenames may differ across devices.
-- Natural ordering proposes the initial correspondence, but the user must confirm or correct pairing.
-- A scene group may contain missing devices; at least two valid images are required for cross-device comparison.
-- Repeated captures are optional and must be explicitly grouped. Consecutive files are not automatically treated as repeats.
-- Original images are read-only.
-
-The core entity is a matched scene group:
+The system therefore must not force the data into a fixed 20-scene taxonomy. The primary entity is a generic matched group:
 
 ```text
 G001: device A image ↔ device B image ↔ device C image
-G002: device A image ↔ device B image ↔ device C image
+G002: device A image ↔ MISSING        ↔ device C image
 ```
 
-Scene groups may remain `UNCLASSIFIED`.
+The 20-scene list remains an optional future capture protocol, not an input requirement.
 
-## 3. Optional Reference Scene Library
+## 2. Evidence hierarchy
 
-A 20-scene front-camera portrait template is retained only as an optional future capture protocol. It is not a mandatory classification scheme and must not block analysis of existing images.
+Every conclusion is separated into four levels:
 
-Examples include open shade, strong sunlight, side light, backlight, mixed light, neon, low light, close-up, edge framing, multi-face scenes, and portrait-mode segmentation scenes.
+1. **Observable output:** visible and measurable behavior in a submitted image.
+2. **Scene-level trade-off:** relative behavior within one matched group.
+3. **Cross-scene tendency:** a repeated output pattern supported by multiple comparable groups.
+4. **Mechanism attribution:** a conservative hypothesis across hardware, capture, reconstruction, rendering, or beautification.
 
-## 4. Content-Adaptive Analysis
+A single image cannot establish a stable device strategy. Mechanism attribution is never written as a confirmed proprietary implementation unless public evidence directly supports it.
 
-Every scene receives baseline analysis:
+## 3. Input and pairing contract
 
-- pairing and comparability audit;
-- face/person detection;
-- face and background luminance;
-- highlight and shadow statistics;
-- skin color consistency;
-- apparent detail, noise, smoothing, and artifacts;
-- anonymous cross-device visual review.
+- Accept arbitrary device folders and image counts.
+- Natural sort proposes initial correspondence.
+- The user may replace any pairing cell with another image from the same device or mark it missing.
+- Missing cells remain explicit and never shift later groups silently.
+- At least two valid devices are required for a group to be comparatively analyzable.
+- Repeats are explicit-only; adjacent files are not automatically treated as repeated captures.
+- Pairing confirmation uses an optimistic version check and freezes the current snapshot.
 
-Specialized analysis is activated from observed content:
+## 4. Image fact layer
 
-- illuminated signs/screens → emissive-highlight analysis;
-- multiple faces → multi-face exposure and skin consistency;
-- strong blur → portrait segmentation analysis;
-- mixed illuminants → local color consistency and AWB behavior;
-- side light → left/right facial light-ratio analysis;
-- face near frame edge → geometry and stretching analysis.
+For every valid image, the system records:
 
-Automatic scene tags are suggestions, not facts. Each tag records its source: user input, imported metadata, model suggestion, or human confirmation.
+- checksum, dimensions, orientation, EXIF summary, and original path;
+- display-referred luminance quantiles;
+- near-white clipping and deep-shadow proportions;
+- saturation, apparent detail, and noise proxies;
+- primary-face detection;
+- face, background, face-ring, highlight, and shadow regions;
+- diagnostic overlays and validity warnings.
 
-## 5. Evaluation Pipeline
+The metrics describe rendered output. They do not reconstruct sensor radiance and do not equate higher values with better quality.
+
+## 5. Adaptive scene audit
+
+Scene groups are classified as:
+
+- `FULLY_COMPARABLE`
+- `COMPARABLE_WITH_CONFOUNDERS`
+- `NOT_COMPARABLE`
+
+The system may suggest content tags such as `low_light`, `high_dynamic_range`, or `strong_highlight`, but these tags are not required and are not treated as ground truth without review.
+
+## 6. Dual-model protocol
+
+- Devices are anonymized independently for every group.
+- The primary model performs the main structured analysis.
+- The reviewer first performs an independent pass.
+- The reviewer then performs a challenge pass with the primary output and objective evidence.
+- Model output is validated against a structured schema.
+- The deterministic metric/adjudication layer, not majority voting, decides claim status.
+- OpenAI-compatible endpoints allow local Qwen-VL and InternVL-family deployment.
+- A deterministic heuristic adapter is available only for infrastructure tests.
+
+## 7. Evidence adjudication
+
+Claims contain:
+
+- statement and device;
+- supporting and contradicting groups;
+- objective support;
+- model agreement;
+- scene validity;
+- alternative explanations;
+- confidence and evidence grade.
+
+Grades:
+
+- **A:** repeated, comparable, objective and model support, limited counterevidence;
+- **B:** meaningful support with one material uncertainty;
+- **C:** single-scene, conflicted, or insufficiently controlled.
+
+C-grade strategy claims do not enter the executive findings of the report.
+
+## 8. Cross-scene inference
+
+The current engine computes conservative output tendencies such as:
+
+- higher display-referred global luminance relative to the matched-group median;
+- lower near-white clipping ratio relative to the matched-group median.
+
+Claims retain counterexamples and alternative explanations. The system does not equate low clipping with actual highlight detail, nor global brightness with local face relighting.
+
+## 9. External professional corroboration
+
+The order is mandatory:
 
 ```text
-Create project
-→ register devices and folders
-→ scan and propose matched scene groups
-→ human pairing confirmation
-→ image decode, EXIF, checksum, and comparability audit
-→ ROI extraction and objective metrics
-→ blind primary VLM analysis
-→ independent heterogeneous reviewer analysis
-→ deterministic evidence adjudication
-→ scene-level conclusions
-→ scene-coverage gate
-→ optional cross-scene strategy inference
-→ freeze internal results
-→ retrieve professional external reviews
-→ corroboration and capture-bias assessment
-→ hardware/capture/reconstruction/rendering attribution
-→ human review
-→ versioned HTML/PDF report
+internal blind analysis
+→ internal result snapshot frozen
+→ hardware and professional-review search
+→ corroboration and conflict review
+→ capture-bias assessment
 ```
 
-## 6. Image Facts and ROI
+External sources:
 
-The system separates:
+- cannot overwrite the submitted-image result;
+- cannot directly modify image-quality scores;
+- can support or weaken generalization from the submitted samples to a device-level tendency;
+- can trigger `POSSIBLE_CAPTURE_BIAS` or a controlled reshoot recommendation.
 
-1. original encoded image;
-2. display-referred sRGB image;
-3. approximately linearized display RGB for relative luminance analysis.
+Sources are deduplicated by URL and graded by source type. Back-camera results or other models are not treated as direct front-camera evidence.
 
-Linearized JPEG values are display-space measurements, not recovered scene radiance.
+## 10. Capture-bias handling
 
-ROI hierarchy:
+Potential capture bias is raised when:
 
-- whole image;
-- person/subject;
-- face and facial skin;
-- forehead, cheeks, nose, chin, eye regions, neck;
-- left/right facial regions;
-- near-face background ring;
-- bright, dark, emissive, sky, window, and scene-specific regions.
+- a claim relies on one scene or one capture;
+- group comparability warnings are present;
+- independent professional evidence contradicts the attempted generalization;
+- shooting mode, fill light, beautification, firmware, or EXIF is unknown.
 
-Invalid or low-quality ROI must not silently produce trusted metrics.
+A recommended reshoot requires alternating device order, at least three valid repetitions, fixed shooting modes, recorded firmware and fill-light states, consistent subject geometry, and original uncompressed files.
 
-## 7. Objective Metrics
+## 11. Hardware and mechanism attribution
 
-Core metric families:
+Hardware research and attribution are separated from the blind image review. Candidate causes are organized across:
 
-- face and background luminance percentiles;
-- face-background relative EV;
-- highlight clipping and near-highlight ratios;
-- shadow and deep-black ratios;
-- facial left/right light ratio;
-- skin lightness, hue, chroma, and face-neck discontinuity;
-- apparent detail, edge overshoot, noise proxy, smoothing, and blockiness;
-- geometry, edge stretching, flare, ghosting, and segmentation artifacts.
+- hardware;
+- capture;
+- reconstruction;
+- rendering;
+- beautification/portrait processing.
 
-Metrics describe output behavior. They are not automatically converted into “higher is better” scores.
+The default result is `indeterminate` when EXIF, public specifications, or discriminating scenes are insufficient. Hardware parameters do not directly contribute to the image-quality score.
 
-Every metric stores:
+## 12. Review and reporting
+
+The browser console supports:
+
+- project and device registration;
+- pairing review and correction;
+- task submission and status;
+- diagnostic and analysis retrieval;
+- review-item resolution;
+- draft report access and finalization.
+
+Reports are generated from structured evidence, not from an unconstrained final language-model response. Outputs include HTML, JSON, CSV, optional PDF, and a privacy-preserving project export ZIP.
+
+## 13. Architecture
 
 ```text
-value
-ROI reference
-algorithm version
-validity
-confidence
-warnings
+Windows browser
+      ↓ SSH tunnel / LAN
+FastAPI modular application
+      ↓
+SQLite persistent source of truth
+      ↓
+Persistent task queue + Linux worker
+      ↓
+CV metrics / local VLMs / web research / reporting
+      ↓
+Local artifact workspace
 ```
 
-## 8. Dual-Model Review
+SQLite uses foreign keys, WAL mode, and a busy timeout. Original image paths are never accepted directly by asset APIs; registered image IDs are used.
 
-### Primary analyst
+## 14. Final-report gate
 
-Performs two passes:
+A final report cannot be generated while open review items remain. Final versions are immutable files and do not overwrite earlier report versions.
 
-1. visual-only observation;
-2. metric-assisted correction.
+## 15. Non-goals of v0.1
 
-### Independent reviewer
-
-Performs:
-
-1. independent blind observation;
-2. challenge pass after seeing primary claims, metrics, and audit warnings.
-
-Device order is randomized independently for each scene. Brand, model, folder name, and public reviews are hidden during blind analysis.
-
-Model output must be schema-valid and separate:
-
-- observable fact;
-- degree judgment;
-- subjective preference;
-- strategy hypothesis;
-- mechanism attribution.
-
-## 9. Evidence Adjudication
-
-The final result is not a model vote. A deterministic adjudicator combines:
-
-- scene comparability;
-- ROI quality;
-- objective evidence;
-- primary/reviewer agreement;
-- repeatability when available;
-- confounders and counterexamples.
-
-Results include:
-
-- confirmed observation;
-- disputed observation;
-- subjective preference;
-- insufficient evidence;
-- rejected mechanism inference;
-- human review required.
-
-## 10. Cross-Scene Strategy Gate
-
-Sparse or unclassified scenes must not be over-generalized.
-
-The system may always report scene-specific differences. Device-level strategy claims require sufficient coverage across multiple relevant and distinct conditions.
-
-If coverage is inadequate, create:
-
-```text
-INSUFFICIENT_SCENE_COVERAGE
-```
-
-and stop at scene-level conclusions.
-
-Strategy claims use A/B/C evidence grades and must include supporting scenes, contradictory scenes, scope, and alternative explanations. C-grade hypotheses do not enter the executive summary.
-
-## 11. External Professional Corroboration
-
-External search occurs only after internal image analysis is frozen.
-
-The system searches professional labs and review media using claim-specific queries, such as front-camera backlight HDR, selfie low-light detail, skin tone, autofocus, flare, or portrait segmentation.
-
-Source priority:
-
-1. independent labs with clear protocol and original samples;
-2. professional camera/technology reviewers;
-3. general media with relevant front-camera samples;
-4. forums/social posts only as issue-discovery signals.
-
-Manufacturer pages are hardware/function sources, not independent image-quality corroboration.
-
-Each external comparison is classified as:
-
-```text
-CORROBORATED
-PARTIALLY_CORROBORATED
-CONTRADICTED
-CONSENSUS_SPLIT
-INCOMPARABLE
-NO_RELEVANT_EVIDENCE
-```
-
-External reviews do not change the score of the current samples. They affect generalizability, evidence grade, and capture-bias risk.
-
-## 12. Capture-Bias Assessment
-
-Create `POSSIBLE_CAPTURE_BIAS` when the internal result conflicts with multiple relevant professional sources and the current capture has confounders, only one sample, unknown modes, uncertain fill light, missing EXIF, or abnormal outlier behavior.
-
-Possible actions:
-
-- retain the current-sample result but prohibit device-level generalization;
-- reduce evidence grade;
-- narrow scope;
-- request human review;
-- generate a controlled reshoot protocol;
-- mark `RESHOOT_RECOMMENDED` or `RESHOOT_REQUIRED_FOR_GENERALIZATION`.
-
-Reshoots create a new run and never overwrite the original evidence.
-
-## 13. Attribution
-
-Attribution uses five layers:
-
-```text
-Hardware
-Capture
-Reconstruction
-Rendering
-Beautification / Portrait Processing
-```
-
-Allowed top-level results:
-
-- hardware-dominant;
-- software-dominant;
-- hardware-software joint;
-- indeterminate.
-
-The system must not infer a named proprietary algorithm from rendered JPEGs unless supported by explicit public evidence.
-
-## 14. Architecture
-
-```text
-React/Vite review console
-        ↓
-FastAPI
-        ↓
-Dramatiq + Redis workers
-        ↓
-Python evaluation core
-        ↓
-SQLite + local artifact store
-```
-
-Deployment:
-
-- Linux GPU server;
-- Windows browser client;
-- SSH tunnel and configurable LAN mode;
-- native `uv` development;
-- Docker Compose deployment;
-- source images mounted read-only.
-
-The first release uses SQLite behind repository abstractions so PostgreSQL remains a future migration path.
-
-## 15. Review Console
-
-Core pages:
-
-- projects;
-- project overview;
-- pairing review;
-- dataset audit;
-- scene analysis;
-- claims and attribution;
-- hardware research;
-- report export.
-
-Human operations include accept, edit, reject, lower confidence, mark preference, mark insufficient evidence, correct ROI, rerun selected tasks, and invalidate downstream results.
-
-## 16. Reports
-
-MVP outputs:
-
-- HTML;
-- PDF;
-- JSON;
-- CSV.
-
-Every important statement maps to an evidence claim and links to images, ROI, metrics, model outputs, review decisions, or external sources.
-
-Draft reports may contain unresolved items with explicit warnings. Final reports require all consequential review items to be resolved and must preserve immutable versions.
-
-## 17. Failure and Recovery
-
-- Redis is not the source of truth; SQLite reconstructs pending/interrupted tasks.
-- Single-scene failures do not block unrelated scenes.
-- Network research failure does not block visual evaluation.
-- HTML remains available if PDF rendering fails.
-- ROI, prompt, model, pairing, and hardware changes invalidate only dependent downstream nodes.
-- GPU OOM degradation must be explicit and reviewable; resolution reduction is never silent.
-
-## 18. MVP Milestones
-
-1. repository, schemas, configuration, SQLite/Alembic, and state machine;
-2. folder scan, natural pairing, edit/freeze pairing, basic audit and asset serving;
-3. ROI and objective metrics;
-4. primary VLM structured evaluation;
-5. reviewer VLM, conflicts, adjudication, and review queue;
-6. cross-scene claims, external corroboration, hardware attribution, reports, Docker, and recovery.
-
-## 19. Core Invariants
-
-```text
-Rendered-image observation ≠ internal algorithm fact
-Cross-scene regularity ≠ unique mechanism identification
-Hardware capability ≠ achieved final image quality
-VLM agreement ≠ ground truth
-Objective metric ≠ aesthetic preference
-External media consensus ≠ replacement for current samples
-```
-
-The preferred conclusion is the narrowest statement that survives image evidence, metrics, independent review, counterexamples, external corroboration, and human inspection.
+- camera capture automation;
+- video or RAW evaluation;
+- model training/fine-tuning;
+- multi-user cloud deployment;
+- multi-GPU distributed inference;
+- a universal rear-camera benchmark.
