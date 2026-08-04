@@ -45,7 +45,7 @@ N device folders
 → freeze internal result snapshot
 → hardware and professional-review search
 → capture-bias assessment and attribution review
-→ HTML/JSON/CSV report
+→ HTML/JSON/CSV/DOCX report
 → optional human review gate and immutable final report
 ```
 
@@ -71,8 +71,8 @@ The input does **not** need to follow a fixed 20-scene taxonomy. Arbitrary match
 - Conservative hardware/capture/reconstruction/rendering attribution cases
 - Persistent atomic task claiming, bounded retries, and Linux worker
 - Four-step React/Vite product workflow plus advanced engineering review console
-- Signed read-only HTML/PDF report links for other computers on the same network
-- HTML, JSON, CSV, optional PDF, privacy-preserving project export, and review-aware immutable final reports
+- Signed read-only HTML/PDF/DOCX report links for other computers on the same network
+- HTML, JSON, CSV, reference-derived DOCX, optional PDF, privacy-preserving project export, and review-aware immutable final reports
 - Native Python and Docker Compose deployment
 
 ## Quick start: native Linux

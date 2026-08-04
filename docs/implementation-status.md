@@ -17,7 +17,7 @@ The repository contains a runnable end-to-end MVP covering:
 - capture-bias and attribution cases;
 - atomic persistent worker tasks with bounded retry;
 - browser review interfaces;
-- review-aware immutable final report bundle, optional PDF, and project export;
+- review-aware immutable final report bundle with reference-derived DOCX, optional PDF, and project export;
 - Docker and CI definitions;
 - backend unit/integration tests.
 

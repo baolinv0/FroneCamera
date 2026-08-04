@@ -315,11 +315,53 @@ class EvaluationPipeline:
             self.repo.create_review_item(project_id, "mechanism_attribution_review", attribution)
         self.repo.save_analysis(project_id, "attribution_case", attribution_cases)
 
+        device_names = {device["id"]: device["name"] for device in pairing["devices"]}
+        visual_assets: list[dict[str, Any]] = []
+        for group in pairing["groups"]:
+            selected_cells = [
+                (device_id, cell) for device_id, cell in group["cells"].items() if cell is not None
+            ][:6]
+            visual_assets.extend(
+                {
+                    "scene_id": group["group_id"],
+                    "device_id": device_id,
+                    "device_name": device_names.get(device_id, device_id),
+                    "path": cell["path"],
+                    "filename": cell["filename"],
+                }
+                for device_id, cell in selected_cells
+            )
+        device_profiles = []
+        for device in pairing["devices"]:
+            strategy_findings = [
+                item["statement"]
+                for item in all_findings
+                if item.get("device_id") == device["id"]
+                and item.get("claim_type") == "strategy"
+                and item.get("grade") in {"A", "B"}
+            ]
+            device_profiles.append(
+                {
+                    "device_id": device["id"],
+                    "device_name": device["name"],
+                    "label": "Evidence Profile",
+                    "summary": "；".join(strategy_findings[:2])
+                    or "需要更多跨场景证据形成稳定画像。",
+                }
+            )
+
         report_payload = ReportPayload(
             project_name=project.name,
             devices=[device["name"] for device in pairing["devices"]],
             findings=[item for item in all_findings if item["grade"] in {"A", "B"}],
             scene_results=scene_results,
+            visual_assets=visual_assets,
+            device_profiles=device_profiles,
+            methodology_notes=[
+                "同一场景内先进行匿名横向比较，再恢复设备身份。",
+                "客观指标、主模型、独立审阅和挑战审阅共同进入裁决。",
+                "只把 A/B 级证据写入正式结论，C 级保留为复核线索。",
+            ],
             external_validation=external,
             hardware_context=hardware_context,
             attributions=attribution_cases,

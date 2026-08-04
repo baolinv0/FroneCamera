@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import html
 import json
+import re
+import shutil
 from pathlib import Path
 from typing import Any
 
@@ -12,7 +14,13 @@ class ReportPayload(BaseModel):
     project_name: str
     devices: list[str]
     findings: list[dict[str, Any]]
+    report_title: str | None = None
+    report_subtitle: str | None = None
     scene_results: list[dict[str, Any]] = Field(default_factory=list)
+    visual_assets: list[dict[str, Any]] = Field(default_factory=list)
+    device_profiles: list[dict[str, Any]] = Field(default_factory=list)
+    device_scores: list[dict[str, Any]] = Field(default_factory=list)
+    methodology_notes: list[str] = Field(default_factory=list)
     external_validation: list[dict[str, Any]] = Field(default_factory=list)
     hardware_context: list[dict[str, Any]] = Field(default_factory=list)
     attributions: list[dict[str, Any]] = Field(default_factory=list)
@@ -61,7 +69,7 @@ def render_html_report(payload: ReportPayload, output: Path, status: str = "draf
     document = f"""<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width">
 <title>{html.escape(payload.project_name)}</title>
-<style>body{{font-family:Arial,sans-serif;max-width:1200px;margin:40px auto;padding:0 24px;color:#17202a}}header{{border-bottom:2px solid #17202a}}article,details{{border:1px solid #ddd;padding:16px;margin:12px 0;border-radius:8px}}small{{color:#5d6d7e}}pre{{white-space:pre-wrap}}.draft{{background:#fff3cd;padding:8px}}.final{{background:#dcfae6;padding:8px}}</style></head>
+<style>body{{font-family:"Noto Sans CJK SC",Arial,sans-serif;max-width:1200px;margin:40px auto;padding:0 24px;color:#202124}}header{{border-bottom:4px solid #f97316}}article,details{{border:1px solid #d6d6d6;padding:16px;margin:12px 0;border-radius:8px}}small{{color:#666}}pre{{white-space:pre-wrap}}.draft{{background:#fff3cd;padding:8px}}.final{{background:#dcfae6;padding:8px}}</style></head>
 <body><header><h1>{html.escape(payload.project_name)}</h1><p class="{banner_class}">{banner}</p>
 <p>Devices: {html.escape(", ".join(payload.devices))}</p></header>
 <section><h2>Evidence-backed findings</h2>{findings or "<p>No approved findings.</p>"}</section>
@@ -75,6 +83,50 @@ def render_html_report(payload: ReportPayload, output: Path, status: str = "draf
     return output
 
 
+def _asset_slug(value: Any, fallback: str) -> str:
+    slug = re.sub(r"[^A-Za-z0-9._-]+", "-", str(value or "").strip()).strip("-._")
+    return slug[:60] or fallback
+
+
+def _materialize_visual_assets(payload: ReportPayload, output_dir: Path) -> ReportPayload:
+    """Copy source images beside the report and persist only relative paths."""
+    assets_dir = output_dir / "assets"
+    normalized: list[dict[str, Any]] = []
+    for index, item in enumerate(payload.visual_assets):
+        asset = dict(item)
+        raw_path = asset.get("path") or asset.get("source_path")
+        if not raw_path:
+            asset.pop("source_path", None)
+            normalized.append(asset)
+            continue
+        source = Path(str(raw_path))
+        if not source.is_absolute():
+            candidate = output_dir / source
+            if candidate.is_file():
+                asset["path"] = candidate.relative_to(output_dir).as_posix()
+                asset.pop("source_path", None)
+                normalized.append(asset)
+                continue
+        if not source.is_file():
+            asset["path"] = ""
+            asset["missing"] = True
+            asset.pop("source_path", None)
+            normalized.append(asset)
+            continue
+        assets_dir.mkdir(parents=True, exist_ok=True)
+        scene = _asset_slug(asset.get("scene_id") or asset.get("group_id"), "scene")
+        device = _asset_slug(asset.get("device_name") or asset.get("device_id"), "device")
+        suffix = source.suffix.lower() if source.suffix else ".jpg"
+        destination = assets_dir / f"{index + 1:03d}-{scene}-{device}{suffix}"
+        if source.resolve() != destination.resolve():
+            shutil.copy2(source, destination)
+        asset["path"] = destination.relative_to(output_dir).as_posix()
+        asset["filename"] = source.name
+        asset.pop("source_path", None)
+        normalized.append(asset)
+    return payload.model_copy(update={"visual_assets": normalized})
+
+
 def render_report_bundle(
     payload: ReportPayload,
     output_dir: Path,
@@ -85,6 +137,7 @@ def render_report_bundle(
 
     output_dir.mkdir(parents=True, exist_ok=True)
     stem = f"{status}-v{version}"
+    payload = _materialize_visual_assets(payload, output_dir)
     html_path = render_html_report(payload, output_dir / f"{stem}.html", status=status)
     json_path = output_dir / f"{stem}.json"
     json_path.write_text(payload.model_dump_json(indent=2), encoding="utf-8")
@@ -105,7 +158,14 @@ def render_report_bundle(
                     "evidence": ";".join(item.get("evidence", [])),
                 }
             )
-    return {"html": html_path, "json": json_path, "csv": csv_path}
+    from portrait_eval.docx_reporting import render_docx_report
+
+    docx_path = render_docx_report(
+        payload,
+        output_dir / f"{stem}.docx",
+        status=status,
+    )
+    return {"html": html_path, "json": json_path, "csv": csv_path, "docx": docx_path}
 
 
 def render_pdf_report(html_path: Path, pdf_path: Path) -> Path:

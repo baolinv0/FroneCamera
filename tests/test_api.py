@@ -147,6 +147,34 @@ def test_report_html_endpoint_returns_requested_version(tmp_path: Path) -> None:
     assert b"requested-version" in response.content
 
 
+def test_report_docx_endpoint_returns_registered_report_bundle(tmp_path: Path) -> None:
+    settings = Settings(
+        database_url=f"sqlite:///{tmp_path / 'docx.db'}", workspace=tmp_path / "workspace"
+    )
+    settings.prepare()
+    client = TestClient(create_app(settings))
+    project = client.post("/api/projects", json={"name": "docx"}).json()
+    report_dir = settings.workspace / "projects" / project["id"] / "reports"
+    report_dir.mkdir(parents=True)
+    html_path = report_dir / "draft-v0.1.html"
+    docx_path = report_dir / "draft-v0.1.docx"
+    html_path.write_text("<h1>report</h1>", encoding="utf-8")
+    docx_path.write_bytes(b"docx-placeholder")
+    from portrait_eval.database import Database
+    from portrait_eval.repository import Repository
+
+    database = Database(settings.database_url)
+    with database.session_factory() as session:
+        report = Repository(session).save_report(project["id"], "0.1", "draft", str(html_path))
+
+    response = client.get(f"/api/reports/{report.id}/docx")
+    assert response.status_code == 200
+    assert response.content == b"docx-placeholder"
+    assert response.headers["content-type"].startswith(
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+    )
+
+
 def test_finalize_regenerates_bundle_and_applies_rejected_attribution_review(
     tmp_path: Path,
 ) -> None:
@@ -243,6 +271,7 @@ def test_read_only_report_share_url_uses_signed_token(tmp_path: Path) -> None:
     html_path = settings.workspace / "projects" / project["id"] / "reports" / "final-v1.0.html"
     html_path.parent.mkdir(parents=True)
     html_path.write_text("<h1>shared-report</h1>", encoding="utf-8")
+    html_path.with_suffix(".docx").write_bytes(b"shared-docx")
     from portrait_eval.database import Database
     from portrait_eval.repository import Repository
 
@@ -262,3 +291,7 @@ def test_read_only_report_share_url_uses_signed_token(tmp_path: Path) -> None:
     assert public.status_code == 200
     assert b"shared-report" in public.content
     assert public.headers["content-type"].startswith("text/html")
+    assert share.json()["docx_url"].startswith(f"/reports/{report.id}/docx?token=")
+    public_docx = client.get(share.json()["docx_url"])
+    assert public_docx.status_code == 200
+    assert public_docx.content == b"shared-docx"

@@ -106,6 +106,7 @@ def register_product_routes(app: FastAPI) -> None:
             "token": token,
             "url": f"/reports/{report_id}?token={token}",
             "pdf_url": f"/reports/{report_id}/pdf?token={token}",
+            "docx_url": f"/reports/{report_id}/docx?token={token}",
         }
 
     @app.get("/reports/{report_id}", response_class=HTMLResponse)
@@ -142,6 +143,27 @@ def register_product_routes(app: FastAPI) -> None:
             except RuntimeError as exc:
                 raise HTTPException(status_code=501, detail=str(exc)) from exc
         return FileResponse(pdf_path, media_type="application/pdf", filename=pdf_path.name)
+
+    @app.get("/reports/{report_id}/docx")
+    def public_report_docx(
+        report_id: str,
+        token: str,
+        repo: Repository = Depends(repository),
+    ) -> FileResponse:
+        validate_share_token(report_id, token)
+        row = repo.session.get(ReportRow, report_id)
+        if row is None:
+            raise HTTPException(status_code=404, detail="Report not found")
+        html_path = _report_path(settings, row)
+        docx_path = html_path.with_suffix(".docx")
+        if not docx_path.is_file():
+            raise HTTPException(status_code=404, detail="DOCX report not found")
+        return FileResponse(
+            docx_path,
+            media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            filename=docx_path.name,
+            headers={"Cache-Control": "private, no-store"},
+        )
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:

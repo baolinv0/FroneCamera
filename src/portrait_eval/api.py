@@ -368,6 +368,24 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 raise HTTPException(status_code=501, detail=str(exc)) from exc
         return FileResponse(pdf_path, media_type="application/pdf", filename=pdf_path.name)
 
+    @app.get("/api/reports/{report_id}/docx", dependencies=[Depends(authorize)])
+    def report_docx(report_id: str, repo: Repository = Depends(repository)) -> FileResponse:
+        row = repo.session.get(ReportRow, report_id)
+        if row is None:
+            raise HTTPException(status_code=404, detail="Report not found")
+        html_path = Path(row.html_path).resolve()
+        workspace = settings.workspace.resolve()
+        if workspace not in html_path.parents or not html_path.is_file():
+            raise HTTPException(status_code=403, detail="Invalid report path")
+        docx_path = html_path.with_suffix(".docx")
+        if not docx_path.is_file():
+            raise HTTPException(status_code=404, detail="DOCX report not found")
+        return FileResponse(
+            docx_path,
+            media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            filename=docx_path.name,
+        )
+
     @app.post("/api/projects/{project_id}/reports/finalize", dependencies=[Depends(authorize)])
     def finalize_report(project_id: str, repo: Repository = Depends(repository)) -> dict[str, Any]:
         open_items = list(
