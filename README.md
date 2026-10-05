@@ -3,6 +3,8 @@
 This branch provides the independently installable IQA project in `packages/iqa`, for training-data screening and comparing algorithm versions. The existing Front source is retained from the parent snapshot. The corrected Front pipeline is delivered on [the integration branch](https://github.com/baolinv0/FroneCamera/tree/feature/iqa-frontcamera-integration-20261005).
 
 ```bash
+git clone --branch feature/iqa-standalone-20261005 https://github.com/baolinv0/FroneCamera.git FroneCamera-iqa
+cd FroneCamera-iqa
 python -m venv .venv-iqa
 source .venv-iqa/bin/activate
 pip install ./packages/iqa

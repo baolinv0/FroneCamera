@@ -5,6 +5,8 @@
 Python 3.10+; no Front server, database or web application is needed:
 
 ```bash
+git clone --branch feature/iqa-standalone-20261005 https://github.com/baolinv0/FroneCamera.git FroneCamera-iqa
+cd FroneCamera-iqa
 python -m venv .venv-iqa
 source .venv-iqa/bin/activate
 pip install './packages/iqa'
@@ -68,6 +70,8 @@ Input is a JSON list of unique `id` records with boolean `risk`, plus optional `
 Python 3.12:
 
 ```bash
+git clone --branch feature/iqa-frontcamera-integration-20261005 https://github.com/baolinv0/FroneCamera.git FroneCamera
+cd FroneCamera
 bash scripts/install_development.sh
 source .venv/bin/activate
 portrait-eval-api --help
