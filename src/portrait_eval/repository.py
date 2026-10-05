@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 from typing import Any, cast
+from uuid import uuid4
 
 from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
@@ -157,6 +158,7 @@ class Repository:
                     if image is None
                     else {
                         "image_id": image.id,
+                        "checksum": image.checksum,
                         "filename": image.filename,
                         "path": image.path,
                         "width": image.width,
@@ -194,10 +196,18 @@ class Repository:
                 }
                 for image in images
             ]
+        snapshot = self.session.scalar(
+            select(PairingSnapshotRow).where(
+                PairingSnapshotRow.project_id == project_id,
+                PairingSnapshotRow.version == project.version,
+            )
+        )
         return {
+            "pairing_snapshot_id": snapshot.id if snapshot else None,
             "project_id": project_id,
             "version": project.version,
-            "confirmed": project.status == ProjectStatus.PAIRING_CONFIRMED.value,
+            "confirmed": bool(groups)
+            and all(group.confirmed and group.version == project.version for group in groups),
             "devices": [
                 {
                     "id": device.id,
@@ -264,8 +274,11 @@ class Repository:
             group.version = project.version
         self.session.flush()
         snapshot_payload = self.get_pairing(project_id)
+        snapshot_id = str(uuid4())
+        snapshot_payload["pairing_snapshot_id"] = snapshot_id
         self.session.add(
             PairingSnapshotRow(
+                id=snapshot_id,
                 project_id=project_id,
                 version=project.version,
                 payload_json=json_dump(snapshot_payload),

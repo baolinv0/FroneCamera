@@ -29,14 +29,46 @@ const headers=()=>{const h={'Content-Type':'application/json'};const token=docum
 async function api(path,options={}){const r=await fetch(path,{...options,headers:{...headers(),...(options.headers||{})}});if(!r.ok)throw new Error(`${r.status}: ${await r.text()}`);return r.headers.get('content-type')?.includes('json')?r.json():r.text()}
 function fail(e){document.getElementById('error').textContent=String(e)}
 async function createProject(){try{await api('/api/projects',{method:'POST',body:JSON.stringify({name:document.getElementById('projectName').value})});loadProjects()}catch(e){fail(e)}}
-async function loadProjects(){try{const rows=await api('/api/projects');document.getElementById('projects').innerHTML=rows.map(p=>`<div><button class="secondary" onclick="openProject('${p.id}','${p.name.replaceAll("'",'')}')">Open</button> <b>${p.name}</b> <span class="status">${p.status}</span></div>`).join('')}catch(e){fail(e)}}
+async function loadProjects(){
+  try{
+    const rows=await api('/api/projects');
+    const container=document.getElementById('projects');
+    container.replaceChildren();
+    for(const project of rows){
+      const row=document.createElement('div');
+      const button=document.createElement('button');
+      button.className='secondary';button.textContent='Open';
+      button.addEventListener('click',()=>openProject(String(project.id),String(project.name??'')).catch(fail));
+      const name=document.createElement('b');name.textContent=String(project.name??'');
+      const status=document.createElement('span');status.className='status';status.textContent=String(project.status??'');
+      row.append(button,document.createTextNode(' '),name,document.createTextNode(' '),status);
+      container.append(row);
+    }
+  }catch(e){fail(e)}
+}
 async function openProject(id,name){currentProject=id;document.getElementById('workspace').hidden=false;document.getElementById('workspaceTitle').textContent=name;await loadPairing();await loadReviews();document.getElementById('reportLink').href=`/api/projects/${id}/reports/latest`;document.getElementById('reportLink').textContent=' Open latest report'}
 async function addDevice(){try{await api(`/api/projects/${currentProject}/devices`,{method:'POST',body:JSON.stringify({name:deviceName.value,canonical_model:deviceModel.value||null,folder_path:deviceFolder.value})});message.textContent='Device added'}catch(e){fail(e)}}
 async function scan(){try{pairing=await api(`/api/projects/${currentProject}/scan`,{method:'POST'});renderPairing()}catch(e){fail(e)}}
-async function loadPairing(){try{pairing=await api(`/api/projects/${currentProject}/pairing`);renderPairing()}catch(e){pairing=null;pairingDiv.innerHTML='No pairing yet'}}
-function renderPairing(){if(!pairing)return;const heads=pairing.devices.map(d=>`<th>${d.name}</th>`).join('');const rows=pairing.groups.map(g=>{const confidence=g.matching_confidence==null?'n/a':`${Math.round(g.matching_confidence*100)}%`;const badge=g.review_required?`<span class="status review" title="${(g.match_notes||[]).join('; ')}">REVIEW ${confidence}</span>`:`<span class="status matched" title="${(g.match_notes||[]).join('; ')}">AUTO ${confidence}</span>`;return `<tr><td>${g.group_id}<br>${badge}</td>${pairing.devices.map(d=>`<td>${g.cells[d.id]?.filename||'<span class="muted">MISSING</span>'}</td>`).join('')}</tr>`}).join('');document.getElementById('pairing').innerHTML=`<p>Version ${pairing.version}; confirmed=${pairing.confirmed}</p><table><thead><tr><th>Group</th>${heads}</tr></thead><tbody>${rows}</tbody></table>`}
+async function loadPairing(){try{pairing=await api(`/api/projects/${currentProject}/pairing`);renderPairing()}catch(e){pairing=null;document.getElementById('pairing').textContent='No pairing yet'}}
+const escapeHtml=value=>String(value??'').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;').replaceAll("'",'&#39;');
+function renderPairing(){if(!pairing)return;const heads=pairing.devices.map(d=>`<th>${escapeHtml(d.name)}</th>`).join('');const rows=pairing.groups.map(g=>{const confidence=g.matching_confidence==null?'unknown':`${Math.round(g.matching_confidence*100)}%`;const notes=(g.match_notes||[]).map(escapeHtml).join('<br>');const badge=`<span class="status ${g.review_required?'review':'matched'}">${g.review_required?'Review required':'Automatic match'} ${confidence}</span>`;return `<tr><td>${escapeHtml(g.group_id)}<br>${badge}<p>${notes}</p></td>${pairing.devices.map(d=>{const cell=g.cells[d.id];return `<td>${cell?`<img data-image-id="${escapeHtml(cell.image_id)}" ${headers().Authorization?'':`src="/api/assets/${encodeURIComponent(cell.image_id)}"`} alt="${escapeHtml(d.name+' '+cell.filename)}" width="120" height="90" style="object-fit:contain"><br>${escapeHtml(cell.filename)}`:'<span class="muted">MISSING</span>'}</td>`}).join('')}</tr>`}).join('');document.getElementById('pairing').innerHTML=`<p>Version ${escapeHtml(pairing.version)}; ${pairing.confirmed?'Manually confirmed pairing':'Pairing awaiting manual confirmation'}</p><table><thead><tr><th>Group</th>${heads}</tr></thead><tbody>${rows}</tbody></table>`;if(headers().Authorization){document.querySelectorAll('[data-image-id]').forEach(async image=>{try{const response=await fetch(`/api/assets/${encodeURIComponent(image.dataset.imageId)}`,{headers:headers()});if(!response.ok)return;const url=URL.createObjectURL(await response.blob());image.src=url;image.onload=()=>URL.revokeObjectURL(url)}catch(e){fail(e)}})}}
+
 async function confirmPairing(){try{pairing=await api(`/api/projects/${currentProject}/pairing/confirm`,{method:'POST',body:JSON.stringify({expected_version:pairing.version})});renderPairing()}catch(e){fail(e)}}
 async function runEvaluation(){try{const task=await api(`/api/projects/${currentProject}/run`,{method:'POST'});message.textContent=`Queued task ${task.id}. Start portrait-eval-worker on Linux.`}catch(e){fail(e)}}
-async function loadReviews(){try{const items=await api(`/api/projects/${currentProject}/review-items`);document.getElementById('reviews').innerHTML='<h3>Review items</h3>'+items.map(i=>`<article><b>${i.category}</b> ${i.status}<pre>${JSON.stringify(i.payload,null,2)}</pre></article>`).join('')}catch(e){fail(e)}}
+async function loadReviews(){
+  try{
+    const items=await api(`/api/projects/${currentProject}/review-items`);
+    const container=document.getElementById('reviews');
+    const heading=document.createElement('h3');heading.textContent='Review items';
+    container.replaceChildren(heading);
+    for(const item of items){
+      const article=document.createElement('article');
+      const category=document.createElement('b');category.textContent=String(item.category??'');
+      const payload=document.createElement('pre');payload.textContent=JSON.stringify(item.payload,null,2)??'';
+      article.append(category,document.createTextNode(` ${String(item.status??'')}`),payload);
+      container.append(article);
+    }
+  }catch(e){fail(e)}
+}
 loadProjects();
 </script></body></html>

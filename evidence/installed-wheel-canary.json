@@ -1,0 +1,14 @@
+{
+  "schema_version": "frone-iqa.software-canary/1",
+  "evidence_kind": "synthetic_images_and_heuristic_adapters",
+  "comparison_deterministic": true,
+  "front_scene_count": 2,
+  "front_iqa_scene_count": 2,
+  "source_byte_binding": true,
+  "privacy_export_has_host_paths": false,
+  "front_status": "REPORT_FINALIZED",
+  "paid_endpoint_calls": 0,
+  "training_runs": 0,
+  "elapsed_seconds": 1.0244352829977288,
+  "process_peak_rss_kib": 160936
+}

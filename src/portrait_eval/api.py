@@ -408,66 +408,27 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         if draft is None:
             raise HTTPException(status_code=404, detail="Draft report not found")
         source = Path(draft.html_path)
-        existing_final = [
-            item for item in repo.list_reports(project_id) if item["status"] == "final"
-        ]
-        version = f"1.{len(existing_final)}"
         source_json = source.with_suffix(".json")
-        if source_json.is_file():
-            payload = ReportPayload.model_validate_json(source_json.read_text(encoding="utf-8"))
-            resolved_reviews = repo.list_review_items(project_id)
-            rejected_statements = {
-                str(item["payload"].get("statement"))
-                for item in resolved_reviews
-                if item["status"] in {"rejected", "insufficient_evidence"}
-                and isinstance(item["payload"], dict)
-                and item["payload"].get("statement")
-            }
-            rejected_external = {
-                (
-                    str(item["payload"].get("url")),
-                    str(item["payload"].get("claim_statement")),
-                )
-                for item in resolved_reviews
-                if item["category"] == "external_corroboration_review"
-                and item["status"] in {"rejected", "insufficient_evidence"}
-                and isinstance(item["payload"], dict)
-            }
-            payload.findings = [
-                item
-                for item in payload.findings
-                if str(item.get("statement")) not in rejected_statements
-            ]
-            payload.attributions = [
-                item
-                for item in payload.attributions
-                if str(item.get("statement")) not in rejected_statements
-            ]
-            payload.external_validation = [
-                item
-                for item in payload.external_validation
-                if (str(item.get("url")), str(item.get("claim_statement"))) not in rejected_external
-            ]
-            bundle = render_report_bundle(payload, source.parent, version, "final")
-            destination = bundle["html"]
-        else:
-            destination = source.with_name(f"final-v{version}.html")
-            document = source.read_text(encoding="utf-8")
-            document = document.replace(
-                "DRAFT — verify review gates before external distribution.",
-                "FINAL REPORT — review gates resolved.",
+        if not source_json.is_file():
+            raise HTTPException(
+                status_code=409,
+                detail="Draft report payload not found; publication cannot apply review decisions",
             )
-            destination.write_text(document, encoding="utf-8")
-        row = repo.save_report(project_id, version, "final", str(destination))
-        project = repo.get_project(project_id)
-        project.status = "REPORT_FINALIZED"
-        repo.session.commit()
-        return {
-            "id": row.id,
-            "version": row.version,
-            "status": row.status,
-            "html_path": row.html_path,
-        }
+        from portrait_eval.report_projection import resolve_report_payload
+
+        try:
+            payload = ReportPayload.model_validate_json(source_json.read_text(encoding="utf-8"))
+            payload = resolve_report_payload(payload, repo.list_review_items(project_id))
+        except ValueError as exc:
+            raise HTTPException(
+                status_code=409, detail=f"Draft publication cannot resolve evidence: {exc}"
+            ) from exc
+        from portrait_eval.report_publication import PublicationConflict, publish_final_report
+
+        try:
+            return publish_final_report(repo, project_id, payload, source, render_report_bundle)
+        except PublicationConflict as exc:
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
 
     return app
 

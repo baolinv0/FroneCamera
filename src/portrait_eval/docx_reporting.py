@@ -301,11 +301,9 @@ def _add_cover(document: DocxDocument, payload: ReportPayload, status: str) -> N
         run = paragraph.add_run(detail)
         _set_run_font(run, size=7, color=MUTED)
     _add_spacer(document, 6)
-    banner = (
-        "FINAL REPORT — review gates resolved."
-        if status == "final"
-        else "DRAFT — verify review gates before external distribution."
-    )
+    from portrait_eval.report_projection import publication_banner
+
+    banner = publication_banner(payload, status)
     _add_callout(
         document,
         "报告性质",
@@ -579,6 +577,9 @@ def _add_methodology(document: DocxDocument, payload: ReportPayload) -> None:
         f"报告嵌入 {asset_count} 张代表样张用于人工复核。",
         "只发布通过证据等级与复核状态门槛的结论。",
     ]
+    from portrait_eval.report_projection import publication_notes
+
+    notes = [*notes, *publication_notes(payload), f"Review status: {payload.review_summary}"]
     paragraph = _clear_cell(left)
     run = paragraph.add_run("数据与证据层级")
     _set_run_font(run, size=9, color=ACCENT, bold=True)

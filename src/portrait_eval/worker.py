@@ -3,6 +3,8 @@ from __future__ import annotations
 import argparse
 import time
 
+import httpx
+
 from portrait_eval.config import Settings
 from portrait_eval.corroboration import (
     HeuristicCorroborationAdapter,
@@ -28,6 +30,18 @@ def _adapters(settings: Settings):
         else HeuristicCorroborationAdapter()
     )
     return primary, reviewer, search, corroborator
+
+
+def _retryable_error(error: Exception) -> bool:
+    """Retry transport outages/rate limits, preserving permanent response failures."""
+    current: BaseException | None = error
+    while current is not None:
+        if isinstance(current, (httpx.TransportError, TimeoutError, ConnectionError)):
+            return True
+        if isinstance(current, httpx.HTTPStatusError):
+            return current.response.status_code == 429 or current.response.status_code >= 500
+        current = current.__cause__
+    return False
 
 
 def execute_one(settings: Settings) -> bool:
@@ -56,7 +70,7 @@ def execute_one(settings: Settings) -> bool:
             service.mark_succeeded(task.id, result)
         except Exception as exc:  # worker boundary must persist failures
             error = f"{type(exc).__name__}: {exc}"
-            if task.attempts < settings.task_max_attempts:
+            if task.attempts < settings.task_max_attempts and _retryable_error(exc):
                 service.mark_retryable(task.id, error)
             else:
                 service.mark_failed(task.id, error)

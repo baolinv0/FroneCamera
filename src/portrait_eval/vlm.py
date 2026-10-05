@@ -9,20 +9,27 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 import httpx
-from PIL import Image, ImageOps
+from PIL import Image
 
-from portrait_eval.models import ModelEvaluationResult, ModelObservation
+from portrait_eval.model_validation import (
+    anonymous_context,
+    decode_model_result,
+    evidence_catalog,
+    request_trace,
+)
+from portrait_eval.models import KNOWN_DIMENSIONS, ModelEvaluationResult, ModelObservation
+from portrait_eval.pixel_io import display_uint8, load_normalized_rgb
 
 if TYPE_CHECKING:
     from portrait_eval.config import Settings
 
 
 def encode_image_data_url(path: Path, max_edge: int = 1536) -> str:
-    with Image.open(path) as source:
-        image = ImageOps.exif_transpose(source).convert("RGB")
-        image.thumbnail((max_edge, max_edge), Image.Resampling.LANCZOS)
-        buffer = BytesIO()
-        image.save(buffer, format="JPEG", quality=92, optimize=True)
+    pixels, _ = load_normalized_rgb(path)
+    image = Image.fromarray(display_uint8(pixels))
+    image.thumbnail((max_edge, max_edge), Image.Resampling.LANCZOS)
+    buffer = BytesIO()
+    image.save(buffer, format="JPEG", quality=92, optimize=True)
     encoded = base64.b64encode(buffer.getvalue()).decode("ascii")
     return f"data:image/jpeg;base64,{encoded}"
 
@@ -37,7 +44,11 @@ def parse_json_object(content: str) -> dict[str, Any]:
         if lines and lines[-1].strip() == "```":
             lines = lines[:-1]
         stripped = "\n".join(lines).strip()
-    decoder = json.JSONDecoder()
+    decoder = json.JSONDecoder(
+        parse_constant=lambda value: (_ for _ in ()).throw(
+            ValueError(f"Non-finite model value: {value}")
+        )
+    )
     for index, character in enumerate(stripped):
         if character != "{":
             continue
@@ -90,6 +101,17 @@ class VisionModelAdapter(ABC):
         raise NotImplementedError
 
 
+def adapter_identity(adapter: VisionModelAdapter) -> str | None:
+    """A role/pass change does not create a distinct model identity."""
+    model = getattr(adapter, "model", None)
+    if isinstance(model, str) and model.strip():
+        return "model:" + model.strip().casefold()
+    if isinstance(adapter, HeuristicVisionAdapter):
+        return "heuristic"
+    explicit = getattr(adapter, "model_identity", None)
+    return str(explicit) if explicit else None
+
+
 class OpenAICompatibleVisionAdapter(VisionModelAdapter):
     def __init__(
         self,
@@ -108,14 +130,23 @@ class OpenAICompatibleVisionAdapter(VisionModelAdapter):
     def analyze(
         self, scene_id: str, image_paths: dict[str, Path], context: dict[str, Any]
     ) -> ModelEvaluationResult:
-        content: list[dict[str, Any]] = [{"type": "text", "text": self._prompt(scene_id, context)}]
-        for code, path in image_paths.items():
+        context = anonymous_context(context)
+        context["allowed_evidence_refs"] = sorted(
+            evidence_catalog(scene_id, list(image_paths), context)
+        )
+        prompt = self._prompt(scene_id, context)
+        codes_and_urls = [
+            (code, encode_image_data_url(path, self.max_image_edge))
+            for code, path in image_paths.items()
+        ]
+        content: list[dict[str, Any]] = [{"type": "text", "text": prompt}]
+        for code, url in codes_and_urls:
             content.extend(
                 [
                     {"type": "text", "text": f"Anonymous device {code}"},
                     {
                         "type": "image_url",
-                        "image_url": {"url": encode_image_data_url(path, self.max_image_edge)},
+                        "image_url": {"url": url},
                     },
                 ]
             )
@@ -125,20 +156,31 @@ class OpenAICompatibleVisionAdapter(VisionModelAdapter):
             "response_format": {"type": "json_object"},
             "messages": [{"role": "user", "content": content}],
         }
+        self.last_input_trace = request_trace(prompt, codes_and_urls, payload)
         response = httpx.post(
             f"{self.base_url}/v1/chat/completions", json=payload, timeout=self.timeout
         )
         response.raise_for_status()
         raw = response.json()
         parsed = parse_json_object(raw["choices"][0]["message"]["content"])
-        parsed.update({"scene_id": scene_id, "role": self.role, "raw": raw})
-        return ModelEvaluationResult.model_validate(parsed)
+        return decode_model_result(
+            parsed,
+            scene_id,
+            self.role,
+            list(image_paths),
+            context,
+            raw,
+            request_trace(prompt, codes_and_urls, payload),
+        )
 
     def _prompt(self, scene_id: str, context: dict[str, Any]) -> str:
         return (
             "Evaluate anonymous front-camera portraits. Separate visible observations, subjective preferences, "
-            "and mechanism hypotheses. Do not identify brands. Return JSON with observations, scores, hypotheses, "
-            f"confidence. Scene={scene_id}. Objective context={json.dumps(context, ensure_ascii=False)}"
+            "and mechanism hypotheses. Do not identify brands. Use only listed devices and evidence references. "
+            "Return JSON with observations [{device_id, dimension, statement, evidence_refs, certainty}], "
+            "scores (dimension: integer 0..100), hypotheses [{statement,evidence_refs,alternatives,confidence}], "
+            "confidence (0..1). Dimensions=" + json.dumps(sorted(KNOWN_DIMENSIONS)) + "; "
+            f"Scene={scene_id}. Devices/evidence=context. Objective context={json.dumps(context, ensure_ascii=False)}"
         )
 
 
@@ -168,16 +210,23 @@ class OpenAIResponsesVisionAdapter(VisionModelAdapter):
     def analyze(
         self, scene_id: str, image_paths: dict[str, Path], context: dict[str, Any]
     ) -> ModelEvaluationResult:
-        content: list[dict[str, Any]] = [
-            {"type": "input_text", "text": self._prompt(scene_id, context)}
+        context = anonymous_context(context)
+        context["allowed_evidence_refs"] = sorted(
+            evidence_catalog(scene_id, list(image_paths), context)
+        )
+        prompt = self._prompt(scene_id, context)
+        codes_and_urls = [
+            (code, encode_image_data_url(path, self.max_image_edge))
+            for code, path in image_paths.items()
         ]
-        for code, path in image_paths.items():
+        content: list[dict[str, Any]] = [{"type": "input_text", "text": prompt}]
+        for code, url in codes_and_urls:
             content.extend(
                 [
                     {"type": "input_text", "text": f"Anonymous device {code}"},
                     {
                         "type": "input_image",
-                        "image_url": encode_image_data_url(path, self.max_image_edge),
+                        "image_url": url,
                     },
                 ]
             )
@@ -186,18 +235,20 @@ class OpenAIResponsesVisionAdapter(VisionModelAdapter):
             if self.base_url.endswith("/v1")
             else f"{self.base_url}/v1/responses"
         )
+        payload = {
+            "model": self.model,
+            "input": [{"role": "user", "content": content}],
+            "max_output_tokens": self.max_output_tokens,
+            "text": {"format": {"type": "json_object"}},
+        }
+        self.last_input_trace = request_trace(prompt, codes_and_urls, payload)
         response = httpx.post(
             endpoint,
             headers={
                 "Authorization": f"Bearer {self.api_key}",
                 "Content-Type": "application/json",
             },
-            json={
-                "model": self.model,
-                "input": [{"role": "user", "content": content}],
-                "max_output_tokens": self.max_output_tokens,
-                "text": {"format": {"type": "json_object"}},
-            },
+            json=payload,
             timeout=self.timeout,
         )
         try:
@@ -214,15 +265,22 @@ class OpenAIResponsesVisionAdapter(VisionModelAdapter):
             ) from exc
         raw = response.json()
         parsed = parse_json_object(extract_responses_output_text(raw))
-        parsed.update({"scene_id": scene_id, "role": self.role, "raw": raw})
-        return ModelEvaluationResult.model_validate(parsed)
+        return decode_model_result(
+            parsed,
+            scene_id,
+            self.role,
+            list(image_paths),
+            context,
+            raw,
+            request_trace(prompt, codes_and_urls, payload),
+        )
 
     def _prompt(self, scene_id: str, context: dict[str, Any]) -> str:
         contract = {
             "observations": [
                 {
                     "device_id": "anonymous device code such as A",
-                    "dimension": "stable snake_case rendering dimension",
+                    "dimension": "one of: " + ", ".join(sorted(KNOWN_DIMENSIONS)),
                     "statement": "visible, evidence-based comparison",
                     "evidence_refs": ["asset or metric reference"],
                     "certainty": "number from 0 to 1",
@@ -342,5 +400,6 @@ class HeuristicVisionAdapter(VisionModelAdapter):
             scores={},
             hypotheses=[],
             confidence=0.65,
-            raw={"adapter": "heuristic"},
+            raw={"adapter": "heuristic", "evidence_kind": "demonstration"},
+            provisional=True,
         )

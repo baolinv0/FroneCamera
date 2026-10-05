@@ -17,11 +17,6 @@ from portrait_eval.vlm import VisionModelAdapter
 EvaluationMode = Literal["quick", "professional"]
 
 
-def _next_final_version(repo: Repository, project_id: str) -> str:
-    finals = [item for item in repo.list_reports(project_id) if item["status"] == "final"]
-    return f"1.{len(finals)}"
-
-
 def finalize_quick_report(repo: Repository, project_id: str) -> dict[str, Any]:
     draft = repo.session.scalar(
         select(ReportRow)
@@ -36,6 +31,9 @@ def finalize_quick_report(repo: Repository, project_id: str) -> dict[str, Any]:
         raise ValueError("Draft report payload not found")
 
     payload = ReportPayload.model_validate_json(source_json.read_text(encoding="utf-8"))
+    from portrait_eval.report_projection import resolve_report_payload
+
+    payload = resolve_report_payload(payload, repo.list_review_items(project_id), mode="quick")
     quick_note = (
         "Quick mode generated this report without requiring every review item to be resolved. "
         "Low-confidence findings remain scoped to the submitted captures and should be reviewed "
@@ -44,18 +42,9 @@ def finalize_quick_report(repo: Repository, project_id: str) -> dict[str, Any]:
     if quick_note not in payload.limitations:
         payload.limitations.append(quick_note)
 
-    version = _next_final_version(repo, project_id)
-    bundle = render_report_bundle(payload, source.parent, version, "final")
-    row = repo.save_report(project_id, version, "final", str(bundle["html"]))
-    project = repo.get_project(project_id)
-    project.status = "REPORT_FINALIZED"
-    repo.session.commit()
-    return {
-        "id": row.id,
-        "version": row.version,
-        "status": row.status,
-        "html_path": row.html_path,
-    }
+    from portrait_eval.report_publication import publish_final_report
+
+    return publish_final_report(repo, project_id, payload, source, render_report_bundle)
 
 
 def run_evaluation_workflow(

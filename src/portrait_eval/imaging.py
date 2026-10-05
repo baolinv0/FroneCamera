@@ -4,7 +4,8 @@ from pathlib import Path
 
 import cv2
 import numpy as np
-from PIL import Image, ImageOps
+
+from portrait_eval.pixel_io import display_uint8, load_normalized_rgb, normalized_rgb
 
 try:
     from pillow_heif import register_heif_opener
@@ -15,30 +16,38 @@ except ImportError:
 
 
 def load_rgb(path: Path) -> np.ndarray:
-    with Image.open(path) as image:
-        rgb = ImageOps.exif_transpose(image).convert("RGB")
-        return np.asarray(rgb)
+    pixels, _ = load_normalized_rgb(path)
+    return pixels
 
 
 def _luminance(image: np.ndarray) -> np.ndarray:
-    rgb = image.astype(np.float32) / 255.0
+    rgb = normalized_rgb(image)
     return 0.2126 * rgb[..., 0] + 0.7152 * rgb[..., 1] + 0.0722 * rgb[..., 2]
 
 
-def detect_primary_face(image: np.ndarray) -> list[int] | None:
-    gray = cv2.cvtColor(image, cv2.COLOR_RGB2GRAY)
+def detect_faces(image: np.ndarray) -> list[list[int]]:
+    """Return every valid detector box; ordering is by area, not person identity."""
+    gray = cv2.cvtColor(display_uint8(image), cv2.COLOR_RGB2GRAY)
     cascade = cv2.CascadeClassifier(cv2.data.haarcascades + "haarcascade_frontalface_default.xml")
     faces = cascade.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=5, minSize=(32, 32))
-    if len(faces) == 0:
-        return None
-    x, y, w, h = max(faces, key=lambda value: value[2] * value[3])
-    return [int(x), int(y), int(w), int(h)]
+    height, width = image.shape[:2]
+    valid = []
+    for x, y, w, h in faces:
+        x, y, w, h = int(x), int(y), int(w), int(h)
+        if x >= 0 and y >= 0 and w > 0 and h > 0 and x + w <= width and y + h <= height:
+            valid.append([x, y, w, h])
+    return sorted(valid, key=lambda box: (-box[2] * box[3], box[0], box[1]))
+
+
+def detect_primary_face(image: np.ndarray) -> list[int] | None:
+    faces = detect_faces(image)
+    return faces[0] if faces else None
 
 
 def compute_image_metrics(image: np.ndarray) -> dict[str, float]:
     luma = _luminance(image)
-    hsv = cv2.cvtColor(image, cv2.COLOR_RGB2HSV).astype(np.float32)
-    gray = cv2.cvtColor(image, cv2.COLOR_RGB2GRAY)
+    hsv = cv2.cvtColor(display_uint8(image), cv2.COLOR_RGB2HSV).astype(np.float32)
+    gray = cv2.cvtColor(display_uint8(image), cv2.COLOR_RGB2GRAY)
     laplacian = cv2.Laplacian(gray, cv2.CV_32F)
     residual = gray.astype(np.float32) - cv2.GaussianBlur(gray, (5, 5), 0).astype(np.float32)
     return {
@@ -59,7 +68,7 @@ def _masked_metrics(image: np.ndarray, mask: np.ndarray) -> dict[str, float] | N
         mask = mask.astype(bool)
     if int(mask.sum()) < 16:
         return None
-    pixels = image[mask].astype(np.float32) / 255.0
+    pixels = normalized_rgb(image)[mask]
     luma = 0.2126 * pixels[:, 0] + 0.7152 * pixels[:, 1] + 0.0722 * pixels[:, 2]
     maximum = pixels.max(axis=1)
     minimum = pixels.min(axis=1)
@@ -92,7 +101,7 @@ def _region_masks(
         face_mask = np.zeros((height, width), dtype=np.uint8)
         center = (x + w // 2, y + h // 2)
         axes = (max(w // 2, 1), max(int(h * 0.55), 1))
-        cv2.ellipse(face_mask, center, axes, 0, 0, 360, 1, -1)
+        cv2.ellipse(face_mask, center, axes, 0, 0, 360, (1,), -1)
         face_bool = face_mask.astype(bool)
         masks["face"] = face_bool
 
@@ -116,7 +125,7 @@ def _write_diagnostic(
     output_path: Path,
 ) -> Path:
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    canvas = image.copy()
+    canvas = display_uint8(image)
     if face:
         x, y, w, h = face
         cv2.rectangle(canvas, (x, y), (x + w, y + h), (0, 255, 0), max(1, image.shape[1] // 500))
@@ -135,9 +144,26 @@ def _write_diagnostic(
 
 
 def analyze_image(path: Path, artifact_dir: Path | None = None) -> dict[str, object]:
-    image = load_rgb(path)
+    image, input_trace = load_normalized_rgb(path)
     luma = _luminance(image)
-    face = detect_primary_face(image)
+    faces = detect_faces(image)
+    face = faces[0] if faces else None
+    per_face = []
+    for index, bbox in enumerate(faces):
+        face_masks = _region_masks(image.shape[:2], bbox, luma)
+        face_regions = {}
+        for region, mask in face_masks.items():
+            value = _masked_metrics(image, mask)
+            if value is not None:
+                face_regions[region] = value
+        per_face.append(
+            {
+                "face_index": index,
+                "bbox": bbox,
+                "regions": face_regions,
+                "correspondence": "unverified",
+            }
+        )
     masks = _region_masks(image.shape[:2], face, luma)
     regions: dict[str, dict[str, float]] = {}
     for name, mask in masks.items():
@@ -147,8 +173,14 @@ def analyze_image(path: Path, artifact_dir: Path | None = None) -> dict[str, obj
 
     payload: dict[str, object] = {
         "whole": compute_image_metrics(image),
+        "input_trace": input_trace,
+        "measurement_encoding": "display_referred_srgb_fixed_dtype_range",
+        "preview_encoding": "fixed_unit_range_to_uint8_rounding",
         "image_size": [int(image.shape[1]), int(image.shape[0])],
         "face_bbox": face,
+        "face_bboxes": faces,
+        "per_face": per_face,
+        "person_correspondence": "unverified",
         "regions": regions,
         "warnings": [],
     }
@@ -184,6 +216,13 @@ def audit_scene(metrics_by_device: dict[str, dict[str, object]]) -> dict[str, ob
     if max(lumas) - min(lumas) > 0.35:
         observations.append("large_rendered_brightness_difference")
 
+    detected_counts = [
+        len(faces) for payload in valid if isinstance(faces := payload.get("face_bboxes"), list)
+    ]
+    if len(detected_counts) == len(valid) and len(set(detected_counts)) > 1:
+        warnings.append("inconsistent_face_count")
+    if any(count > 1 for count in detected_counts):
+        warnings.append("multi_person_correspondence_unverified")
     face_count = sum(payload.get("face_bbox") is not None for payload in valid)
     if face_count != len(valid):
         warnings.append("inconsistent_face_detection")

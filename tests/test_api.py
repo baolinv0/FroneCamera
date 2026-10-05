@@ -78,6 +78,11 @@ def test_finalize_report_creates_new_immutable_final_version(tmp_path: Path) -> 
     draft.write_text(
         "<p>DRAFT — verify review gates before external distribution.</p>", encoding="utf-8"
     )
+    from portrait_eval.reporting import ReportPayload
+
+    draft.with_suffix(".json").write_text(
+        ReportPayload(project_name="report", devices=[], findings=[]).model_dump_json()
+    )
     from portrait_eval.database import Database
     from portrait_eval.repository import Repository
 

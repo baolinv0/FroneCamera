@@ -23,6 +23,7 @@ dependencies = [
   "pyyaml>=6,<7",
   "sqlalchemy>=2.0.36,<3",
   "uvicorn[standard]>=0.34,<1",
+  "qwen-tmqa>=0.2,<0.3",
 ]
 
 [project.optional-dependencies]

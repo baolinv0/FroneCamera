@@ -1,0 +1,3 @@
+# Task 5 documentation remediation
+
+T5-R1-01 Builder FIXED pendingfreshCritic: rootREADME nativeclone selects feature/iqa-frontcamera-integration-20261005; QUICKSTART IQA selects feature/iqa-standalone-20261005 andFront selectsintegrationbranch withmatchingcdcommands. BothbranchesinstalllocalnestedIQA; originalmain isnotpresentedasinstallablesource. RootpublishedstandaloneREADMEalsoexplicitbranchclone. Thisisdocs-only, preservesallproductcode/tests/legacycontracts. Branchdocs willbeverifiedagainafterdelivery; mainunchanged.

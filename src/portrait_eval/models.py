@@ -1,10 +1,13 @@
 from __future__ import annotations
 
+import math
 from enum import StrEnum
 from pathlib import Path
 from typing import Any
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field, StrictInt, field_validator, model_validator
+
+from portrait_eval.core.models_v2 import DimensionId
 
 
 class ProjectStatus(StrEnum):
@@ -56,25 +59,88 @@ class ImageMetrics(BaseModel):
     warnings: list[str] = Field(default_factory=list)
 
 
+KNOWN_DIMENSIONS = {item.value for item in DimensionId} | {"global_exposure", "highlight_retention"}
+
+
 class ModelObservation(BaseModel):
+    claim_id: str = ""
+    model_config = ConfigDict(extra="forbid", allow_inf_nan=False, strict=True)
+
     device_id: str
     dimension: str
-    statement: str
+    statement: str = Field(min_length=1)
     evidence_refs: list[str] = Field(default_factory=list)
     certainty: float = Field(ge=0, le=1)
 
+    @field_validator("dimension")
+    @classmethod
+    def known_dimension(cls, value: str) -> str:
+        if value not in KNOWN_DIMENSIONS:
+            raise ValueError("Unknown evaluation dimension")
+        return value
+
+    @field_validator("evidence_refs")
+    @classmethod
+    def nonempty_refs(cls, values: list[str]) -> list[str]:
+        if any(not value.strip() for value in values):
+            raise ValueError("Evidence references must be nonempty strings")
+        return values
+
+
+class ModelHypothesis(BaseModel):
+    model_config = ConfigDict(extra="forbid", allow_inf_nan=False, strict=True)
+    statement: str = Field(min_length=1)
+    evidence_refs: list[str]
+    alternatives: list[str]
+    confidence: float = Field(ge=0, le=1)
+
 
 class ModelEvaluationResult(BaseModel):
+    model_config = ConfigDict(extra="forbid", allow_inf_nan=False, strict=True)
+
     scene_id: str
     role: str
     observations: list[ModelObservation]
-    scores: dict[str, int] = Field(default_factory=dict)
-    hypotheses: list[dict[str, Any]] = Field(default_factory=list)
+    scores: dict[str, StrictInt] = Field(default_factory=dict)
+    hypotheses: list[ModelHypothesis] = Field(default_factory=list)
     confidence: float = Field(ge=0, le=1)
     raw: dict[str, Any] = Field(default_factory=dict)
+    input_trace: dict[str, Any] = Field(default_factory=dict)
+    provisional: bool = False
+
+    @model_validator(mode="after")
+    def finite_payload(self) -> ModelEvaluationResult:
+        def check(value: Any) -> None:
+            if isinstance(value, float) and not math.isfinite(value):
+                raise ValueError("Non-finite model payload values are prohibited")
+            if isinstance(value, dict):
+                for item in value.values():
+                    check(item)
+            elif isinstance(value, (list, tuple)):
+                for item in value:
+                    check(item)
+
+        check(self.model_dump())
+        return self
+
+    @field_validator("scores")
+    @classmethod
+    def valid_scores(cls, values: dict[str, int]) -> dict[str, int]:
+        if any(
+            key not in KNOWN_DIMENSIONS or not 0 <= value <= 100 for key, value in values.items()
+        ):
+            raise ValueError("Scores require known dimensions and integers from 0 to 100")
+        return values
 
 
 class ClaimCandidate(BaseModel):
+    model_config = ConfigDict(allow_inf_nan=False)
+    claim_id: str = ""
+    dimension: str = ""
+    provisional: bool = False
+    uncertainty: float = Field(default=1.0, ge=0, le=1)
+    source_claim_ids: list[str] = Field(default_factory=list)
+    evidence_refs: list[str] = Field(default_factory=list)
     device_id: str
     statement: str
     claim_type: str
@@ -87,6 +153,12 @@ class ClaimCandidate(BaseModel):
 
 
 class AdjudicatedClaim(BaseModel):
+    claim_id: str = ""
+    dimension: str = ""
+    claim_type: str = "observation"
+    provisional: bool = False
+    evidence_refs: list[str] = Field(default_factory=list)
+    source_claim_ids: list[str] = Field(default_factory=list)
     device_id: str
     statement: str
     status: str

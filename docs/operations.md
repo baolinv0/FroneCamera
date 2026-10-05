@@ -5,7 +5,7 @@
 ```bash
 uv venv --python 3.12
 source .venv/bin/activate
-uv pip install -e ".[dev,pdf]"
+uv pip install -e "./packages/iqa[dev]" -e ".[dev,pdf]"
 cp .env.example .env
 alembic upgrade head
 portrait-eval-api --host 127.0.0.1 --port 7860

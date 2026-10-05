@@ -6,8 +6,9 @@ from collections.abc import Iterable
 from pathlib import Path
 from typing import TypedDict
 
+import cv2
 import numpy as np
-from PIL import ExifTags, Image, ImageOps
+from PIL import ExifTags, Image
 
 try:
     from pillow_heif import register_heif_opener
@@ -17,6 +18,7 @@ except ImportError:
     pass
 
 from portrait_eval.models import DeviceScan, PairingDraft, PairingGroup
+from portrait_eval.pixel_io import load_normalized_rgb
 
 SUPPORTED_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp", ".heic", ".heif"}
 SEQUENCE_PLACEHOLDER_EXTENSIONS = {".dng"}
@@ -58,10 +60,8 @@ def scan_folder(device_id: str, folder: Path) -> DeviceScan:
 def _image_feature(path: Path, size: int = 32) -> np.ndarray | None:
     """Return a compact tone-normalized scene feature, or None for unreadable inputs."""
     try:
-        with Image.open(path) as source:
-            source.draft("RGB", (size * 2, size * 2))
-            image = ImageOps.exif_transpose(source).convert("RGB").resize((size, size))
-            rgb = np.asarray(image, dtype=np.float32) / 255.0
+        pixels, _ = load_normalized_rgb(path)
+        rgb = cv2.resize(pixels, (size, size), interpolation=cv2.INTER_AREA).astype(np.float32)
     except (OSError, ValueError):
         return None
 
@@ -76,7 +76,7 @@ def _image_feature(path: Path, size: int = 32) -> np.ndarray | None:
 
 
 def _feature_distance(left: np.ndarray | None, right: np.ndarray | None) -> float | None:
-    if left is None or right is None:
+    if left is None or right is None or np.linalg.norm(left) < 1e-6 or np.linalg.norm(right) < 1e-6:
         return None
     return float(np.clip(1.0 - np.dot(left, right), 0.0, 2.0))
 
@@ -169,15 +169,15 @@ def _strong_order_mapping(
     reference_count: int,
 ) -> tuple[dict[int, int], dict[int, float], str] | None:
     slots = candidate.sequence_slots
-    if slots and len(slots) == reference_count:
+    if slots and len(slots) == reference_count and None in slots:
         file_indices = {path: index for index, path in enumerate(candidate.files)}
         mapping = {
             ref_index: file_indices[path]
             for ref_index, path in enumerate(slots)
             if path is not None
         }
-        strategy = "ordered_slots_with_raw_placeholders" if None in slots else "equal_count_order"
-        score = 0.99 if None in slots else 0.9
+        strategy = "ordered_slots_with_raw_placeholders"
+        score = 0.99
         confidence = {ref_index: score for ref_index in mapping}
         return mapping, confidence, strategy
 
@@ -219,8 +219,23 @@ def propose_pairing(scans: Iterable[DeviceScan]) -> PairingDraft:
         if scan is reference:
             continue
         strong_mapping = _strong_order_mapping(scan, len(reference.files))
+        if strong_mapping is not None and strong_mapping[2] == "explicit_numeric_ordinal":
+            # Numeric positions are strong only when the reference declares 1..N too.
+            reference_ordinals = [path.stem for path in reference.files]
+            if reference_ordinals != [str(index + 1) for index in range(len(reference.files))]:
+                strong_mapping = None
         if strong_mapping is not None:
             mapping, confidences, strategy = strong_mapping
+            # Explicit ordering remains the proposed map, but content contradiction
+            # removes AUTO confidence and asks the human to resolve the mismatch.
+            for ref_index, candidate_index in mapping.items():
+                distance = _feature_distance(
+                    _image_feature(reference.files[ref_index]),
+                    _image_feature(scan.files[candidate_index]),
+                )
+                if distance is not None and distance > 0.35:
+                    confidences[ref_index] = 0.25
+                    strategy += ":content_conflict"
         else:
             mapping, confidences = _align_to_reference(reference, scan, feature_cache)
             strategy = "content_sequence_alignment"

@@ -1,17 +1,32 @@
 from __future__ import annotations
 
 import hashlib
+import json
 from pathlib import Path
 from typing import Any
+from uuid import uuid4
 
+from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
-from portrait_eval.adjudication import adjudicate_claim
+from portrait_eval.adjudication import adjudicate_claim, stable_claim_id
 from portrait_eval.attribution import attribute_output_claim
 from portrait_eval.bias import assess_capture_bias
 from portrait_eval.corroboration import CorroborationAdapter, HeuristicCorroborationAdapter
+from portrait_eval.database import AnalysisRow, ReportRow, ReviewItemRow
 from portrait_eval.hardware import build_hardware_queries
 from portrait_eval.imaging import analyze_image, audit_scene
+from portrait_eval.iqa_bridge import (
+    dimension_evidence,
+    evaluate_scene,
+    model_evidence_context,
+    scene_evidence_audit,
+)
+from portrait_eval.model_validation import (
+    anonymous_context,
+    semantic_relation,
+    validate_model_result,
+)
 from portrait_eval.models import (
     ClaimCandidate,
     ModelEvaluationResult,
@@ -27,7 +42,7 @@ from portrait_eval.research import (
     grade_source,
 )
 from portrait_eval.strategy import infer_cross_scene_claims
-from portrait_eval.vlm import HeuristicVisionAdapter, VisionModelAdapter
+from portrait_eval.vlm import HeuristicVisionAdapter, VisionModelAdapter, adapter_identity
 
 
 def _anonymous_mapping(
@@ -41,15 +56,30 @@ def _anonymous_mapping(
     return forward, reverse
 
 
+def _restore_evidence_ref(reference: str, reverse: dict[str, str]) -> str:
+    parts = reference.split(":")
+    if len(parts) >= 3 and parts[0] in {"asset", "metric", "iqa"}:
+        parts[2] = reverse.get(parts[2], parts[2])
+    return ":".join(parts)
+
+
 def _restore_device_ids(
     result: ModelEvaluationResult, reverse: dict[str, str]
 ) -> ModelEvaluationResult:
     observations = [
         ModelObservation(
+            claim_id=stable_claim_id(
+                reverse.get(item.device_id, item.device_id),
+                item.dimension,
+                item.statement,
+                [result.scene_id],
+            ),
             device_id=reverse.get(item.device_id, item.device_id),
             dimension=item.dimension,
             statement=item.statement,
-            evidence_refs=item.evidence_refs,
+            evidence_refs=[
+                _restore_evidence_ref(reference, reverse) for reference in item.evidence_refs
+            ],
             certainty=item.certainty,
         )
         for item in result.observations
@@ -72,18 +102,128 @@ class EvaluationPipeline:
         self.workspace = workspace
         self.primary = primary or HeuristicVisionAdapter("primary")
         self.reviewer = reviewer or HeuristicVisionAdapter("reviewer")
+        self.model_identities = {
+            "primary": adapter_identity(self.primary),
+            "reviewer": adapter_identity(self.reviewer),
+        }
+        self.independent_models = (
+            all(self.model_identities.values())
+            and self.model_identities["primary"] != self.model_identities["reviewer"]
+        )
         self.search = search or DisabledSearchProvider()
         self.corroborator = corroborator or HeuristicCorroborationAdapter()
 
     def run(self, project_id: str) -> dict[str, Any]:
         project = self.repo.get_project(project_id)
-        if project.status != ProjectStatus.PAIRING_CONFIRMED.value:
+        if project.status not in {
+            ProjectStatus.PAIRING_CONFIRMED.value,
+            ProjectStatus.FAILED.value,
+        }:
             raise ValueError("Pairing must be confirmed before analysis")
+        snapshots = self.repo.list_pairing_snapshots(project_id)
+        if not snapshots or snapshots[0]["version"] != project.version:
+            raise ValueError(
+                "Confirmed pairing snapshot is missing or stale; confirm pairing again"
+            )
+        snapshot = snapshots[0]
+        pairing = snapshot["payload"]
+        # Evaluate the immutable snapshot, never mutable live pairing rows.
+        checksums = {}
+        for group in pairing["groups"]:
+            for cell in group["cells"].values():
+                if cell:
+                    checksum = cell.get("checksum")
+                    actual = hashlib.sha256(Path(cell["path"]).read_bytes()).hexdigest()
+                    if not checksum or actual != checksum:
+                        raise ValueError(
+                            "Source bytes changed since scan; re-scan and confirm pairing"
+                        )
+                    checksums[cell["image_id"]] = checksum
+        before = {
+            model: set(self.session.scalars(select(model.id).where(model.project_id == project_id)))
+            for model in (AnalysisRow, ReviewItemRow, ReportRow)
+        }
+        self.run_binding = {
+            "attempt_id": str(uuid4()),
+            "pairing_snapshot_id": snapshot["id"],
+            "pairing_version": snapshot["version"],
+            "pairing_sha256": hashlib.sha256(
+                json.dumps(pairing, sort_keys=True, separators=(",", ":")).encode()
+            ).hexdigest(),
+            "source_checksums": checksums,
+            "model_identities": self.model_identities,
+            "independent_models": bool(self.independent_models),
+        }
+        self.active_project_id = project_id
+        self.repo.save_analysis(project_id, "evaluation_run_binding", self.run_binding)
+        try:
+            return self._run_confirmed(project_id, pairing)
+        except Exception as exc:
+            self.session.rollback()
+            # Partial outputs must not look like a successful run, or leak into a retry.
+            for model, ids in before.items():
+                self.session.execute(
+                    delete(model).where(model.project_id == project_id, model.id.not_in(ids))
+                )
+            project = self.repo.get_project(project_id)
+            project.status = ProjectStatus.FAILED.value
+            self.session.commit()
+            self.repo.save_analysis(
+                project_id,
+                "evaluation_failure",
+                {
+                    **self.run_binding,
+                    "error_type": type(exc).__name__,
+                    "error": str(exc),
+                    "model_input_traces": [
+                        getattr(adapter, "last_input_trace", {})
+                        for adapter in (self.primary, self.reviewer)
+                    ],
+                },
+            )
+            raise
+
+    def _analyze(
+        self,
+        adapter: VisionModelAdapter,
+        scene_id: str,
+        paths: dict[str, Path],
+        context: dict[str, Any],
+    ) -> ModelEvaluationResult:
+        # These dictionaries already carry anonymous image codes. A user device
+        # named A/B must not relabel those codes while redacting other identities.
+        identities = {
+            identity: code
+            for identity, code in getattr(self, "identities", {}).items()
+            if identity not in paths
+        }
+        context = anonymous_context(context, identities)
+        result = validate_model_result(
+            adapter.analyze(scene_id, paths, context), scene_id, list(paths), context
+        )
+        # A heuristic/custom adapter cannot hide the declared fallback provenance.
+        if isinstance(adapter, HeuristicVisionAdapter) or result.raw.get("adapter") in {
+            "heuristic",
+            "synthetic",
+        }:
+            result = result.model_copy(update={"provisional": True})
+        return result
+
+    def _run_confirmed(self, project_id: str, pairing: dict[str, Any]) -> dict[str, Any]:
+        project = self.repo.get_project(project_id)
         project.status = ProjectStatus.ANALYZING.value
         self.session.commit()
-        pairing = self.repo.get_pairing(project_id)
         scene_results: list[dict[str, Any]] = []
         all_findings: list[dict[str, Any]] = []
+        if not self.independent_models:
+            self.repo.create_review_item(
+                project_id,
+                "independent_model_evidence_unavailable",
+                {
+                    "model_identities": self.model_identities,
+                    "message": "Shared or unknown model identities provide no independent model consensus evidence.",
+                },
+            )
 
         for group in pairing["groups"]:
             metrics: dict[str, dict[str, object]] = {}
@@ -92,6 +232,10 @@ class EvaluationPipeline:
                 if cell is None:
                     continue
                 path = Path(cell["path"])
+                if hashlib.sha256(path.read_bytes()).hexdigest() != cell["checksum"]:
+                    raise ValueError(
+                        "Source bytes changed during evaluation; re-scan and confirm pairing"
+                    )
                 artifact_dir = (
                     self.workspace
                     / "projects"
@@ -111,9 +255,21 @@ class EvaluationPipeline:
                     image_id=cell["image_id"],
                 )
 
+            iqa_evaluation = evaluate_scene(group["group_id"], paths, metrics)
+            self.repo.save_analysis(
+                project_id, "iqa_evaluation", iqa_evaluation, scene_group_id=group["id"]
+            )
             audit = audit_scene(metrics)
+            iqa_audit = scene_evidence_audit(iqa_evaluation, list(paths))
+            audit["iqa_evidence"] = iqa_audit
+            if not iqa_audit["valid"]:
+                audit["status"] = "NOT_COMPARABLE"
+                existing_warnings = audit.get("warnings", [])
+                audit["warnings"] = (
+                    existing_warnings if isinstance(existing_warnings, list) else []
+                ) + iqa_audit["warnings"]
             self.repo.save_analysis(project_id, "scene_audit", audit, scene_group_id=group["id"])
-            if len(paths) < 2:
+            if len(paths) < 2 or audit["status"] == "NOT_COMPARABLE":
                 self.repo.create_review_item(
                     project_id,
                     "scene_not_comparable",
@@ -121,11 +277,22 @@ class EvaluationPipeline:
                     priority="high",
                 )
                 scene_results.append(
-                    {"group_id": group["group_id"], "audit": audit, "metrics": metrics}
+                    {
+                        "group_id": group["group_id"],
+                        "audit": audit,
+                        "metrics": metrics,
+                        "iqa_evaluation": iqa_evaluation,
+                    }
                 )
                 continue
 
             forward, reverse = _anonymous_mapping(group["group_id"], list(paths))
+            self.identities = {**forward}
+            for device in pairing["devices"]:
+                if device["id"] in forward:
+                    for identity in (device["name"], device.get("canonical_model")):
+                        if identity:
+                            self.identities[identity] = forward[device["id"]]
             anonymous_paths = {forward[device_id]: path for device_id, path in paths.items()}
             anonymous_metrics = {
                 forward[device_id]: payload for device_id, payload in metrics.items()
@@ -137,33 +304,47 @@ class EvaluationPipeline:
                 scene_group_id=group["id"],
             )
 
-            primary_visual_raw = self.primary.analyze(
+            primary_visual_raw = self._analyze(
+                self.primary,
                 group["group_id"],
                 anonymous_paths,
-                {"audit": audit, "pass": "visual"},
+                {
+                    "audit": audit,
+                    "pass": "visual",
+                    "iqa_evidence": model_evidence_context(iqa_evaluation, measurements=False),
+                },
             )
-            primary_raw = self.primary.analyze(
+            primary_raw = self._analyze(
+                self.primary,
                 group["group_id"],
                 anonymous_paths,
                 {
                     "metrics": anonymous_metrics,
                     "audit": audit,
                     "pass": "metric_validation",
+                    "iqa_evidence": model_evidence_context(iqa_evaluation, measurements=True),
                     "visual_observation": primary_visual_raw.model_dump(mode="json"),
                 },
             )
-            reviewer_independent_raw = self.reviewer.analyze(
+            reviewer_independent_raw = self._analyze(
+                self.reviewer,
                 group["group_id"],
                 anonymous_paths,
-                {"audit": audit, "pass": "independent_visual"},
+                {
+                    "audit": audit,
+                    "pass": "independent_visual",
+                    "iqa_evidence": model_evidence_context(iqa_evaluation, measurements=False),
+                },
             )
-            reviewer_challenge_raw = self.reviewer.analyze(
+            reviewer_challenge_raw = self._analyze(
+                self.reviewer,
                 group["group_id"],
                 anonymous_paths,
                 {
                     "metrics": anonymous_metrics,
                     "audit": audit,
                     "pass": "challenge",
+                    "iqa_evidence": model_evidence_context(iqa_evaluation, measurements=True),
                     "primary": primary_raw.model_dump(mode="json"),
                     "reviewer_independent": reviewer_independent_raw.model_dump(mode="json"),
                 },
@@ -205,6 +386,8 @@ class EvaluationPipeline:
                 primary,
                 reviewer_independent,
                 reviewer_challenge,
+                metrics,
+                iqa_evaluation,
             )
             all_findings.extend(scene_findings)
             scene_results.append(
@@ -217,9 +400,28 @@ class EvaluationPipeline:
                     "reviewer_independent": reviewer_independent.model_dump(mode="json"),
                     "reviewer_challenge": reviewer_challenge.model_dump(mode="json"),
                     "findings": scene_findings,
+                    "iqa_evaluation": iqa_evaluation,
+                    "provisional": primary.provisional
+                    or reviewer_independent.provisional
+                    or reviewer_challenge.provisional,
                 }
             )
 
+        # Bind the reported model/measurement outputs to the same bytes, including
+        # mutations that occur after the initial scan verification.
+        for group in pairing["groups"]:
+            for cell in group["cells"].values():
+                if (
+                    cell
+                    and hashlib.sha256(Path(cell["path"]).read_bytes()).hexdigest()
+                    != cell["checksum"]
+                ):
+                    raise ValueError(
+                        "Source bytes changed during evaluation; re-scan and confirm pairing"
+                    )
+        self.session.refresh(project)
+        if project.version != self.run_binding["pairing_version"]:
+            raise ValueError("Pairing changed during evaluation; confirm the new pairing snapshot")
         strategy_claims = infer_cross_scene_claims(scene_results)
         for claim in strategy_claims:
             finding = claim.model_dump(mode="json")
@@ -284,6 +486,7 @@ class EvaluationPipeline:
                     item.get("supports_claim") is False for item in related_external
                 ),
             ).model_dump(mode="json")
+            assessment["claim_id"] = finding["claim_id"]
             assessment["claim_statement"] = finding.get("statement")
             bias_assessments.append(assessment)
             if assessment["status"] == "RESHOOT_REQUIRED_FOR_GENERALIZATION":
@@ -309,6 +512,7 @@ class EvaluationPipeline:
                 hardware_context={"sources": hardware_by_device.get(finding["device_id"], [])},
                 exif_context=device_exif.get(finding["device_id"], {}),
             ).model_dump(mode="json")
+            attribution["claim_id"] = finding["claim_id"]
             attribution["device_id"] = finding["device_id"]
             attribution["supporting_scene_ids"] = finding.get("supporting_scene_ids", [])
             attribution_cases.append(attribution)
@@ -345,6 +549,13 @@ class EvaluationPipeline:
                     "device_id": device["id"],
                     "device_name": device["name"],
                     "label": "Evidence Profile",
+                    "claim_ids": [
+                        item["claim_id"]
+                        for item in all_findings
+                        if item.get("device_id") == device["id"]
+                        and item.get("claim_type") == "strategy"
+                        and item.get("grade") in {"A", "B"}
+                    ],
                     "summary": "；".join(strategy_findings[:2])
                     or "需要更多跨场景证据形成稳定画像。",
                 }
@@ -352,6 +563,39 @@ class EvaluationPipeline:
 
         report_payload = ReportPayload(
             project_name=project.name,
+            pairing_snapshot_id=self.run_binding["pairing_snapshot_id"],
+            input_trace={
+                "run_binding": self.run_binding,
+                "models": [
+                    {
+                        "scene_id": scene["group_id"],
+                        "pass": key,
+                        "input_trace": scene[key].get("input_trace", {}),
+                    }
+                    for scene in scene_results
+                    for key in (
+                        "primary_visual",
+                        "primary",
+                        "reviewer_independent",
+                        "reviewer_challenge",
+                    )
+                    if key in scene
+                ],
+            },
+            provenance_notes=(
+                [
+                    "Heuristic/synthetic scene observations are provisional and require real model or human review."
+                ]
+                if any(scene.get("provisional") for scene in scene_results)
+                else []
+            )
+            + (
+                [
+                    "Primary and reviewer share or lack verified model identity; their agreement is not independent model evidence."
+                ]
+                if not self.independent_models
+                else []
+            ),
             devices=[device["name"] for device in pairing["devices"]],
             findings=[item for item in all_findings if item["grade"] in {"A", "B"}],
             scene_results=scene_results,
@@ -361,6 +605,9 @@ class EvaluationPipeline:
                 "同一场景内先进行匿名横向比较，再恢复设备身份。",
                 "客观指标、主模型、独立审阅和挑战审阅共同进入裁决。",
                 "只把 A/B 级证据写入正式结论，C 级保留为复核线索。",
+                "Model roles and repeated passes are not independent model identities; shared or unknown model identities provide no independent consensus credit."
+                if not self.independent_models
+                else "Primary and reviewer have distinct configured model identities; agreement still requires matching semantics, evidence and uncertainty.",
             ],
             external_validation=external,
             hardware_context=hardware_context,
@@ -403,52 +650,146 @@ class EvaluationPipeline:
         primary: ModelEvaluationResult,
         reviewer: ModelEvaluationResult,
         challenge: ModelEvaluationResult,
+        metrics: dict[str, dict[str, Any]] | None = None,
+        iqa_evaluation: dict[str, Any] | None = None,
     ) -> list[dict[str, Any]]:
         findings: list[dict[str, Any]] = []
         for observation in primary.observations:
-            independent_match = any(
-                item.device_id == observation.device_id and item.dimension == observation.dimension
-                for item in reviewer.observations
+            claim_id = observation.claim_id or stable_claim_id(
+                observation.device_id, observation.dimension, observation.statement, [group_key]
             )
-            challenge_match = any(
-                item.device_id == observation.device_id and item.dimension == observation.dimension
-                for item in challenge.observations
-            )
+
+            def decision(
+                model: ModelEvaluationResult, observation: ModelObservation = observation
+            ) -> tuple[str, float]:
+                matching = [
+                    item
+                    for item in model.observations
+                    if item.device_id == observation.device_id
+                    and item.dimension == observation.dimension
+                ]
+                # Only the same semantic text and declared evidence support an observation.
+                # An unstructured difference is unknown, never presumed agreement.
+                exact = [
+                    item
+                    for item in matching
+                    if " ".join(item.statement.casefold().split())
+                    == " ".join(observation.statement.casefold().split())
+                    and item.evidence_refs
+                ]
+                if any(
+                    semantic_relation(observation.statement, item.statement) == "opposition"
+                    for item in matching
+                ):
+                    return "opposition", 0.0
+                if exact and len(exact) == len(matching):
+                    return "support", min(min(item.certainty for item in exact), model.confidence)
+                return "unknown", 0.0
+
+            independent_decision, independent_strength = decision(reviewer)
+            challenge_decision, challenge_strength = decision(challenge)
+            independent_match = independent_decision == "support"
+            challenge_match = challenge_decision == "support"
             model_agreement = (
-                1.0
-                if independent_match and challenge_match
-                else 0.75
-                if independent_match or challenge_match
-                else 0.35
+                min(
+                    observation.certainty,
+                    primary.confidence,
+                    independent_strength,
+                    challenge_strength,
+                )
+                if self.independent_models and observation.evidence_refs
+                else 0.0
             )
             if not independent_match or not challenge_match:
                 self.repo.create_review_item(
                     project_id,
                     "model_conflict",
                     {
+                        "claim_id": claim_id,
                         "group_id": group_key,
                         "primary_observation": observation.model_dump(mode="json"),
                         "independent_match": independent_match,
                         "challenge_match": challenge_match,
+                        "independent_decision": independent_decision,
+                        "challenge_decision": challenge_decision,
+                        "independent_models": bool(self.independent_models),
+                        "model_identities": self.model_identities,
                         "reviewer_independent": reviewer.model_dump(mode="json"),
                         "reviewer_challenge": challenge.model_dump(mode="json"),
                     },
                     priority="high" if not independent_match and not challenge_match else "medium",
                 )
+            # Text with an asset citation does not establish quantitative objective support.
+            objective_support = 0.0
+            device_metrics = (metrics or {}).get(observation.device_id, {}).get("whole", {})
+            if (
+                observation.evidence_refs
+                and observation.dimension == "global_exposure"
+                and observation.statement
+                == "This output has the highest display-referred mean luminance in the matched group."
+            ):
+                value = device_metrics.get("luma_mean")
+                other_values = [
+                    payload.get("whole", {}).get("luma_mean")
+                    for payload in (metrics or {}).values()
+                ]
+                if (
+                    value is not None
+                    and all(current is not None for current in other_values)
+                    and value == max(other_values)
+                ):
+                    objective_support = 1.0
+            opposition = independent_decision == "opposition" or challenge_decision == "opposition"
+            observed_evidence = (
+                dimension_evidence(iqa_evaluation, observation.device_id, observation.dimension)
+                if iqa_evaluation is not None
+                else None
+            )
+            uncertainty = min(observation.certainty, primary.confidence)
+            if observed_evidence is not None and observed_evidence.get("state") != "measured_proxy":
+                model_agreement = objective_support = uncertainty = 0.0
+                self.repo.create_review_item(
+                    project_id,
+                    "iqa_dimension_unobservable",
+                    {
+                        "claim_id": claim_id,
+                        "device_id": observation.device_id,
+                        "dimension": observation.dimension,
+                        "group_id": group_key,
+                        "iqa_evidence": observed_evidence,
+                    },
+                )
+            if opposition:
+                objective_support = 0.0
             claim = ClaimCandidate(
+                claim_id=claim_id,
+                dimension=observation.dimension,
                 device_id=observation.device_id,
                 statement=observation.statement,
                 claim_type="observation",
+                evidence_refs=observation.evidence_refs,
+                provisional=primary.provisional or reviewer.provisional or challenge.provisional,
+                uncertainty=uncertainty,
                 supporting_scene_ids=[group_key],
-                contradicting_scene_ids=[],
+                contradicting_scene_ids=[group_key] if opposition else [],
                 model_agreement=model_agreement,
-                objective_support=1.0,
-                scene_validity=1.0 if audit["status"] == "FULLY_COMPARABLE" else 0.6,
+                objective_support=objective_support,
+                scene_validity=1.0
+                if audit["status"] == "FULLY_COMPARABLE"
+                else 0.5
+                if audit["status"] == "COMPARABLE_WITH_CONFOUNDERS"
+                else 0.0,
                 alternative_explanations=["capture variation", "framing difference"],
             )
             adjudicated = adjudicate_claim(claim)
             finding = adjudicated.model_dump(mode="json")
             finding["evidence"] = [group_key]
+            finding["model_agreement"] = model_agreement
+            finding["uncertainty"] = uncertainty
+            finding["objective_support"] = objective_support
+            finding["iqa_evidence"] = observed_evidence
+            finding["independent_models"] = bool(self.independent_models)
+            finding["model_identities"] = self.model_identities
             finding["claim_type"] = "observation"
             findings.append(finding)
             self.repo.save_analysis(project_id, "claim", finding, scene_group_id=scene_group_id)
@@ -483,7 +824,9 @@ class EvaluationPipeline:
         devices = {item["id"]: item for item in pairing["devices"]}
         seen_pairs: set[tuple[str, str]] = set()
         for finding in findings:
-            if finding.get("grade") not in {"A", "B"}:
+            if finding.get("grade") not in {"A", "B"} and not (
+                finding.get("claim_type") == "strategy" and finding.get("status") == "PROVISIONAL"
+            ):
                 continue
             device = devices.get(finding["device_id"])
             if not device:
@@ -509,6 +852,7 @@ class EvaluationPipeline:
                     record.update(decision.model_dump(mode="json"))
                     record["supports_claim"] = decision.supports_claim
                     record["query"] = query
+                    record["claim_id"] = finding["claim_id"]
                     record["claim_statement"] = finding["statement"]
                     record["device_id"] = finding["device_id"]
                     external.append(record)

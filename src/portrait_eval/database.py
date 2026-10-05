@@ -13,6 +13,7 @@ from sqlalchemy import (
     Integer,
     String,
     Text,
+    UniqueConstraint,
     create_engine,
     event,
 )
@@ -184,6 +185,25 @@ class ReportRow(Base):
     version: Mapped[str] = mapped_column(String(20))
     status: Mapped[str] = mapped_column(String(30))
     html_path: Mapped[str] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(UTC)
+    )
+
+
+class ReportPublicationRow(Base):
+    """Durable allocation: an ordinal is never reused, including failed rendering."""
+
+    __tablename__ = "report_publications"
+    __table_args__ = (
+        UniqueConstraint("project_id", "ordinal", name="uq_report_publication_project_ordinal"),
+    )
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid4()))
+    project_id: Mapped[str] = mapped_column(
+        ForeignKey("projects.id", ondelete="CASCADE"), index=True
+    )
+    ordinal: Mapped[int] = mapped_column(Integer)
+    status: Mapped[str] = mapped_column(String(30), default="reserved")
+    error: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(UTC)
     )

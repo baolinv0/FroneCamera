@@ -1,0 +1,24 @@
+{
+  "branch": "feature/iqa-standalone-20261005",
+  "head": "9dcc99b815092f0b110db42b668a1d0696569e78",
+  "tree": "f579602626b5238fe6cf1a24f7f6dd2b431c5321",
+  "run_id": 37281059505,
+  "run_url": "https://github.com/baolinv0/FroneCamera/actions/runs/37281059505",
+  "jobs": [
+    {
+      "id": 111669004522,
+      "name": "verify (3.12)",
+      "conclusion": "success"
+    },
+    {
+      "id": 111669004670,
+      "name": "verify (3.10)",
+      "conclusion": "success"
+    },
+    {
+      "id": 111669491349,
+      "name": "exact-head audit",
+      "conclusion": "success"
+    }
+  ]
+}

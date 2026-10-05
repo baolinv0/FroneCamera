@@ -3,7 +3,7 @@ PYTHON ?= python3.12
 .PHONY: install test lint format-check frontend api worker docker-up docker-down
 
 install:
-	$(PYTHON) -m pip install -e ".[dev,pdf]"
+	$(PYTHON) -m pip install -e "./packages/iqa[dev]" -e ".[dev,pdf]"
 
 test:
 	pytest -q

@@ -1,52 +1,46 @@
 from __future__ import annotations
 
+import hashlib
 import json
+import re
 import zipfile
-from pathlib import Path
+from pathlib import Path, PureWindowsPath
 from typing import Any
 
 from portrait_eval.repository import Repository
 
 
-def _sanitized_pairing(pairing: dict[str, Any]) -> dict[str, Any]:
-    sanitized = {
-        "project_id": pairing["project_id"],
-        "version": pairing["version"],
-        "confirmed": pairing["confirmed"],
-        "devices": [
-            {
-                "id": item["id"],
-                "name": item["name"],
-                "canonical_model": item.get("canonical_model"),
-            }
-            for item in pairing.get("devices", [])
-        ],
-        "groups": [],
-    }
-    for group in pairing.get("groups", []):
-        cells = {}
-        for device_id, cell in group.get("cells", {}).items():
-            cells[device_id] = (
-                None
-                if cell is None
-                else {
-                    "image_id": cell["image_id"],
-                    "filename": cell["filename"],
-                    "width": cell["width"],
-                    "height": cell["height"],
-                    "exif": cell.get("exif", {}),
-                }
-            )
-        sanitized["groups"].append(
-            {
-                "id": group["id"],
-                "group_id": group["group_id"],
-                "label": group.get("label"),
-                "analyzable": group.get("analyzable", False),
-                "cells": cells,
-            }
+def sanitize_export(value: Any) -> Any:
+    """Recursively retain lineage while replacing filesystem locations."""
+    if isinstance(value, dict):
+        result = {}
+        for key, item in value.items():
+            safe_key = sanitize_export(key)
+            if safe_key != key:
+                safe_key = "asset:" + hashlib.sha256(str(key).encode()).hexdigest()[:16]
+            result[safe_key] = sanitize_export(item)
+        return result
+    if isinstance(value, (list, tuple)):
+        return [sanitize_export(item) for item in value]
+    if isinstance(value, Path):
+        value = str(value)
+    if isinstance(value, str):
+        # Preserve HTTP evidence URLs and report-relative asset references.
+        if re.fullmatch(r"https?://[^\s]+", value):
+            return value
+        if Path(value).is_absolute() or PureWindowsPath(value).is_absolute():
+            return "asset:" + hashlib.sha256(value.encode()).hexdigest()[:16]
+        value = re.sub(r"\\\\[^\\\s]+\\[^\s\"'<>;,]+", "[redacted-path]", value)
+        value = re.sub(r"[A-Za-z]:[\\/][^\s\"'<>;,]+", "[redacted-path]", value)
+        value = re.sub(
+            r"(?<![A-Za-z0-9:/])/(?:[^\s/\"'<>;,]+/)*[^\s/\"'<>;,]+", "[redacted-path]", value
         )
-    return sanitized
+        return value
+    return value
+
+
+def _sanitized_pairing(pairing: dict[str, Any]) -> dict[str, Any]:
+    return sanitize_export(pairing)
 
 
 def export_project(repo: Repository, project_id: str, workspace: Path) -> Path:
@@ -79,18 +73,29 @@ def export_project(repo: Repository, project_id: str, workspace: Path) -> Path:
         for item in reports
     ]
 
+    snapshots = repo.list_pairing_snapshots(project_id)
+
     with zipfile.ZipFile(output, "w", compression=zipfile.ZIP_DEFLATED) as archive:
         archive.writestr(
-            "manifest.json", json.dumps(manifest, ensure_ascii=False, indent=2, default=str)
+            "manifest.json",
+            json.dumps(sanitize_export(manifest), ensure_ascii=False, indent=2, default=str),
         )
         archive.writestr(
-            "analysis.json", json.dumps(analyses, ensure_ascii=False, indent=2, default=str)
+            "analysis.json",
+            json.dumps(sanitize_export(analyses), ensure_ascii=False, indent=2, default=str),
         )
         archive.writestr(
-            "reviews.json", json.dumps(reviews, ensure_ascii=False, indent=2, default=str)
+            "reviews.json",
+            json.dumps(sanitize_export(reviews), ensure_ascii=False, indent=2, default=str),
+        )
+        archive.writestr(
+            "pairing-snapshots.json",
+            json.dumps(sanitize_export(snapshots), ensure_ascii=False, indent=2, default=str),
         )
         archive.writestr(
             "reports.json",
-            json.dumps(reports_serializable, ensure_ascii=False, indent=2, default=str),
+            json.dumps(
+                sanitize_export(reports_serializable), ensure_ascii=False, indent=2, default=str
+            ),
         )
     return output

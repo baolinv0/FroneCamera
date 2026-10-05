@@ -7,10 +7,16 @@ import shutil
 from pathlib import Path
 from typing import Any
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class ReportPayload(BaseModel):
+    model_config = ConfigDict(extra="allow")
+    evaluation_mode: str | None = None
+    review_summary: dict[str, Any] = Field(default_factory=dict)
+    provenance_notes: list[str] = Field(default_factory=list)
+    pairing_snapshot_id: str | None = None
+    input_trace: dict[str, Any] = Field(default_factory=dict)
     project_name: str
     devices: list[str]
     findings: list[dict[str, Any]]
@@ -60,11 +66,10 @@ def render_html_report(payload: ReportPayload, output: Path, status: str = "draf
         for item in payload.capture_bias
     )
     limitations = "".join(f"<li>{html.escape(item)}</li>" for item in payload.limitations)
-    banner = (
-        "FINAL REPORT — review gates resolved."
-        if status == "final"
-        else "DRAFT — verify review gates before external distribution."
-    )
+    from portrait_eval.report_projection import publication_banner, publication_notes
+
+    banner = publication_banner(payload, status)
+    disclosures = "".join(f"<li>{html.escape(note)}</li>" for note in publication_notes(payload))
     banner_class = "final" if status == "final" else "draft"
     document = f"""<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width">
@@ -72,6 +77,7 @@ def render_html_report(payload: ReportPayload, output: Path, status: str = "draf
 <style>body{{font-family:"Noto Sans CJK SC",Arial,sans-serif;max-width:1200px;margin:40px auto;padding:0 24px;color:#202124}}header{{border-bottom:4px solid #f97316}}article,details{{border:1px solid #d6d6d6;padding:16px;margin:12px 0;border-radius:8px}}small{{color:#666}}pre{{white-space:pre-wrap}}.draft{{background:#fff3cd;padding:8px}}.final{{background:#dcfae6;padding:8px}}</style></head>
 <body><header><h1>{html.escape(payload.project_name)}</h1><p class="{banner_class}">{banner}</p>
 <p>Devices: {html.escape(", ".join(payload.devices))}</p></header>
+<section><h2>Evidence provenance and review</h2><ul>{disclosures}</ul><pre>{html.escape(json.dumps(payload.review_summary))}</pre></section>
 <section><h2>Evidence-backed findings</h2>{findings or "<p>No approved findings.</p>"}</section>
 <section><h2>Scene results</h2>{scenes}</section>
 <section><h2>Hardware context</h2><ul>{hardware or "<li>No hardware evidence retrieved.</li>"}</ul></section>
@@ -138,6 +144,9 @@ def render_report_bundle(
     output_dir.mkdir(parents=True, exist_ok=True)
     stem = f"{status}-v{version}"
     payload = _materialize_visual_assets(payload, output_dir)
+    from portrait_eval.report_projection import publication_notes
+
+    payload = payload.model_copy(update={"provenance_notes": publication_notes(payload)})
     html_path = render_html_report(payload, output_dir / f"{stem}.html", status=status)
     json_path = output_dir / f"{stem}.json"
     json_path.write_text(payload.model_dump_json(indent=2), encoding="utf-8")
