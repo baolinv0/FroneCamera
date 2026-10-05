@@ -16,7 +16,7 @@ format-check:
 	ruff format --check src scripts
 
 frontend:
-	cd web && npm install --no-package-lock && npm test -- --run && npm run build
+	cd web && npm ci && npm test -- --run && npm run build
 
 api:
 	portrait-eval-api --host 127.0.0.1 --port 7860

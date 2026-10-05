@@ -213,7 +213,7 @@ pytest -q
 ruff check src tests scripts
 ruff format --check src scripts
 mypy src/portrait_eval
-cd web && npm install && npm test -- --run && npm run build
+cd web && npm ci && npm test -- --run && npm run build
 ```
 
 ## Documents

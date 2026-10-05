@@ -1,0 +1,43 @@
+{
+  "branch": "feature/iqa-frontcamera-integration-20261005",
+  "head_sha": "c9fa5adb06272c96fe43283391697d3a6c886d21",
+  "tree_sha": "2da15c8474469a2ce639b6f50e30372eef63d670",
+  "run_id": 37284042327,
+  "run_url": "https://github.com/baolinv0/FroneCamera/actions/runs/37284042327",
+  "jobs": [
+    {
+      "id": 111678591758,
+      "name": "backend",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 111678592020,
+      "name": "verify (3.12)",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 111678592049,
+      "name": "verify (3.10)",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 111678592054,
+      "name": "frontend",
+      "status": "completed",
+      "conclusion": "failure"
+    },
+    {
+      "id": 111679024377,
+      "name": "exact-head audit",
+      "status": "completed",
+      "conclusion": "success"
+    }
+  ],
+  "changed_entries_verified": 73,
+  "identical_iqa_files_across_branches": 84,
+  "overall": "REVISE",
+  "open_delivery_issue": "Frontend clean npm 10.9.9 install failed in resolver before tests (edgesOut); independent remediation is in progress."
+}

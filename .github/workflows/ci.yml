@@ -37,7 +37,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
-      - run: npm install --no-package-lock
+      - run: npm ci
       - run: set -o pipefail; npm test -- --run 2>&1 | tee frontend-test.log
       - run: set -o pipefail; npm run build 2>&1 | tee frontend-build.log
       - name: Upload frontend validation logs

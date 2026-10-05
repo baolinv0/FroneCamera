@@ -82,10 +82,12 @@ The actual Front pipeline stores an `iqa_evaluation` for each scene. Cross-devic
 
 ## Verification
 
+Run the complete workflow checks from the integration branch cloned above:
+
 ```bash
 python -m pytest -q
 (cd packages/iqa && python -m pytest -q)
-(cd web && npm install --no-package-lock && npm test -- --run && npm run build)
+(cd web && npm ci && npm test -- --run && npm run build)
 ```
 
 Default model configurations use declared synthetic/heuristic evidence. To evaluate real model quality, configure real endpoints and collect real blind reviews. No real-model accuracy or TM training benefit is established by the local software canary.

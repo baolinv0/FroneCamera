@@ -18,7 +18,6 @@ smoke-workspace/
 smoke.db
 
 *.tsbuildinfo
-web/package-lock.json
 
 # Generated local verification/build artifacts
 packages/iqa/dist/
