@@ -24,6 +24,7 @@ from qwen_tmqa.lineage import (
     EvaluationRunManifest,
     SelectionLineage,
     load_split_assignments,
+    scene_evaluation_sha256,
 )
 from qwen_tmqa.prompts import build_input_manifest
 from qwen_tmqa.pseudo_gt import export_pseudo_gt, select_scene_pseudo_gt
@@ -159,7 +160,7 @@ def _scene(spec: SceneSpec) -> SceneEvaluation:
     )
 
 
-def _lineage() -> SelectionLineage:
+def _lineage(scene: SceneEvaluation) -> SelectionLineage:
     return SelectionLineage(
         evaluation=EvaluationRunManifest(
             evaluation_run_id="run-123",
@@ -167,6 +168,7 @@ def _lineage() -> SelectionLineage:
             dataset_manifest_sha256="b" * 64,
             dataset_version="canary-v1",
             prompt_versions=["tmqa.sequence@3.4"],
+            scene_evaluation_sha256={scene.scene_id: scene_evaluation_sha256(scene)},
         ),
         split="train",
         split_file_sha256="c" * 64,
@@ -178,7 +180,7 @@ def _select(scene: SceneEvaluation, spec: SceneSpec):
         scene,
         spec,
         PseudoGTConfig(),
-        lineage=_lineage(),
+        lineage=_lineage(scene),
     )
 
 

@@ -30,8 +30,11 @@ def test_select_cli_exports_suggestions_with_zero_training_weight(tmp_path):
     config = tmp_path / "config.yaml"
     config.write_text("dataset:\n  expected_levels: [a_000, a_p050]\njudges: []\n")
     scenes = tmp_path / "evaluations.json"
-    scenes.write_text(json.dumps([_scene(spec).model_dump(mode="json")]))
-    manifest = build_evaluation_run_manifest([spec], config, load_config(config))
+    scene = _scene(spec)
+    scenes.write_text(json.dumps([scene.model_dump(mode="json")]))
+    manifest = build_evaluation_run_manifest(
+        [spec], config, load_config(config), evaluations=[scene]
+    )
     manifest.prompt_versions = ["tmqa.sequence@3.4"]
     manifest_path = tmp_path / "run.json"
     write_evaluation_run_manifest(manifest_path, manifest)

@@ -6,7 +6,7 @@ import threading
 from datetime import datetime, timezone
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from typing import Literal
+from typing import BinaryIO, Literal
 from urllib.parse import parse_qs, unquote, urlencode, urlparse
 
 from pydantic import ValidationError
@@ -38,11 +38,56 @@ class ReviewRequestHandler(SimpleHTTPRequestHandler):
         self.send_header("Content-Type", "application/json; charset=utf-8")
         self.send_header("Content-Length", str(len(body)))
         self.end_headers()
-        self.wfile.write(body)
+        if self.command != "HEAD":
+            self.wfile.write(body)
 
     def _serve_static(self, path: str) -> None:
         self.path = path
-        super().do_GET()
+        if self.command == "HEAD":
+            super().do_HEAD()
+        else:
+            super().do_GET()
+
+    def _static_path_allowed(self, path: Path) -> bool:
+        root = self.dashboard_dir.resolve()
+        resolved = path.resolve()
+        if not resolved.is_relative_to(root):
+            return False
+        if resolved == (root / "data" / "reveal_payload.json").resolve():
+            return False
+        if self.mode == "engineering":
+            return True
+        return resolved == root / "review.html" or resolved.is_relative_to(root / "assets")
+
+    def send_head(self) -> BinaryIO | None:
+        # Authorize the same translated filesystem path used by the static handler,
+        # including its directory index. Resolved targets must stay in the surface
+        # permitted for this mode; URL prefixes alone do not constrain symlinks.
+        path = Path(self.translate_path(self.path))
+        try:
+            allowed = self._static_path_allowed(path)
+            if allowed and path.is_dir():
+                for index_name in getattr(self, "index_pages", ("index.html", "index.htm")):
+                    index = path / index_name
+                    if index.is_file():
+                        allowed = self._static_path_allowed(index)
+                        break
+        except (OSError, RuntimeError, ValueError):
+            allowed = False
+        if not allowed:
+            self._send_json(403, {"error": "static file is unavailable in this mode"})
+            return None
+        return super().send_head()
+
+    def do_HEAD(self) -> None:
+        if _canonical_path(self.path) == "/api/reveal":
+            # A metadata request must not persist an exposure or freeze blind gold.
+            self.send_response(405)
+            self.send_header("Allow", "GET")
+            self.send_header("Content-Length", "0")
+            self.end_headers()
+            return
+        self.do_GET()
 
     def do_GET(self) -> None:
         parsed = urlparse(self.path)
@@ -83,7 +128,7 @@ class ReviewRequestHandler(SimpleHTTPRequestHandler):
                 self._serve_static("/review.html")
                 return
             if canonical.startswith("/assets/"):
-                self._serve_static(canonical)
+                self._serve_static(self.path)
                 return
             self._send_json(403, {"error": "route is unavailable in reviewer mode"})
             return
@@ -94,7 +139,7 @@ class ReviewRequestHandler(SimpleHTTPRequestHandler):
         if canonical == "/data/reveal_payload.json":
             self._send_json(403, {"error": "reveal evidence is API-only"})
             return
-        self._serve_static(canonical)
+        self._serve_static(self.path)
 
     def do_POST(self) -> None:
         if _canonical_path(self.path) != "/api/reviews":

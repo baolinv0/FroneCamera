@@ -5,7 +5,7 @@ import hashlib
 import json
 from collections.abc import Iterable
 from pathlib import Path
-from typing import Literal
+from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
@@ -15,6 +15,9 @@ from .image_io import file_sha256
 from .prompts import build_input_manifest
 
 SplitName = Literal["train", "validation", "audit", "benchmark", "holdout"]
+SceneEvaluationDigest = Annotated[
+    str, Field(min_length=64, max_length=64, pattern=r"^[0-9a-f]{64}$")
+]
 
 
 class EvaluationRunManifest(BaseModel):
@@ -24,6 +27,8 @@ class EvaluationRunManifest(BaseModel):
     dataset_manifest_sha256: str = Field(min_length=64, max_length=64)
     dataset_version: str
     prompt_versions: list[str]
+    # Historical manifests remain readable, but cannot authorize candidate selection.
+    scene_evaluation_sha256: dict[str, SceneEvaluationDigest] | None = None
 
 
 class SelectionLineage(BaseModel):
@@ -75,13 +80,38 @@ def dataset_manifest_sha256(specs: Iterable[SceneSpec]) -> str:
     return hashlib.sha256(_canonical_json(payload)).hexdigest()
 
 
+def scene_evaluation_sha256(scene: SceneEvaluation) -> str:
+    """Bind all evaluated policy, scores, stages and judge evidence, after typed normalization."""
+    return hashlib.sha256(_canonical_json(scene.model_dump(mode="json"))).hexdigest()
+
+
+def _scene_evaluation_digests(evaluations: Iterable[SceneEvaluation]) -> dict[str, str]:
+    digests: dict[str, str] = {}
+    for scene in sorted(evaluations, key=lambda item: item.scene_id):
+        if scene.scene_id in digests:
+            raise ValueError(f"duplicate evaluated scene identity: {scene.scene_id}")
+        digests[scene.scene_id] = scene_evaluation_sha256(scene)
+    return digests
+
+
 def build_evaluation_run_manifest(
     specs: Iterable[SceneSpec],
     config_path: Path,
     config: TMQAConfig,
+    *,
+    evaluations: Iterable[SceneEvaluation] | None = None,
+    config_sha256: str | None = None,
 ) -> EvaluationRunManifest:
     specs_list = list(specs)
-    config_sha = file_sha256(config_path)
+    scene_digests = None
+    if evaluations is not None:
+        scene_ids = {spec.scene_id for spec in specs_list}
+        if len(scene_ids) != len(specs_list):
+            raise ValueError("duplicate declared scene identities")
+        scene_digests = _scene_evaluation_digests(evaluations)
+        if set(scene_digests) != scene_ids:
+            raise ValueError("evaluation scene coverage must match the complete declared dataset")
+    config_sha = config_sha256 if config_sha256 is not None else file_sha256(config_path)
     dataset_sha = dataset_manifest_sha256(specs_list)
     prompt_versions = sorted(
         {f"{judge.prompt_id}@{judge.prompt_version}" for judge in config.judges if judge.enabled}
@@ -99,6 +129,7 @@ def build_evaluation_run_manifest(
         dataset_manifest_sha256=dataset_sha,
         dataset_version=getattr(config.dataset, "version", "unversioned"),
         prompt_versions=prompt_versions,
+        scene_evaluation_sha256=scene_digests,
     )
 
 
@@ -118,11 +149,35 @@ def load_evaluation_run_manifest(path: Path) -> EvaluationRunManifest:
 def require_matching_evaluation_config(
     manifest: EvaluationRunManifest,
     config_path: Path,
+    *,
+    config_sha256: str | None = None,
 ) -> None:
-    current = file_sha256(config_path)
+    current = config_sha256 if config_sha256 is not None else file_sha256(config_path)
     if current != manifest.evaluation_config_sha256:
         raise ValueError(
             "evaluation config hash mismatch: rerun evaluation before selecting pseudo-GT"
+        )
+
+
+def require_matching_scene_evaluations(
+    manifest: EvaluationRunManifest,
+    evaluations: Iterable[SceneEvaluation],
+) -> None:
+    """Validate the same in-memory scenes that selection will consume, never a reread file."""
+    if manifest.scene_evaluation_sha256 is None:
+        raise ValueError(
+            "evaluation manifest has no scene result binding: "
+            "rerun evaluation before selecting pseudo-GT"
+        )
+    actual = _scene_evaluation_digests(evaluations)
+    if set(actual) != set(manifest.scene_evaluation_sha256):
+        raise ValueError(
+            "evaluation scene binding coverage mismatch: "
+            "rerun evaluation before selecting pseudo-GT"
+        )
+    if actual != manifest.scene_evaluation_sha256:
+        raise ValueError(
+            "evaluation scene content mismatch: rerun evaluation before selecting pseudo-GT"
         )
 
 
@@ -149,18 +204,25 @@ def verify_scene_evidence(
     spec: SceneSpec,
     evaluation_manifest: EvaluationRunManifest,
 ) -> list[str]:
+    reasons: list[str] = []
+    if evaluation_manifest.scene_evaluation_sha256 is None:
+        reasons.append("EVIDENCE_RUN_BINDING_MISSING")
+    elif evaluation_manifest.scene_evaluation_sha256.get(scene.scene_id) != scene_evaluation_sha256(
+        scene
+    ):
+        reasons.append("EVIDENCE_RUN_BINDING_MISMATCH")
     expected = _manifest_signature(spec)["images"]
     if not scene.model_evaluations:
-        return ["EVIDENCE_IMAGE_MISMATCH"]
+        return reasons + ["EVIDENCE_IMAGE_MISMATCH"]
     for trace in _trace_signature(scene):
         if trace != expected:
-            return ["EVIDENCE_IMAGE_MISMATCH"]
+            return reasons + ["EVIDENCE_IMAGE_MISMATCH"]
     allowed_prompts = set(evaluation_manifest.prompt_versions)
     for evaluation in scene.model_evaluations:
         prompt = f"{evaluation.prompt_trace.prompt_id}@{evaluation.prompt_trace.prompt_version}"
         if prompt not in allowed_prompts:
-            return ["EVIDENCE_PROMPT_MISMATCH"]
-    return []
+            return reasons + ["EVIDENCE_PROMPT_MISMATCH"]
+    return reasons
 
 
 def load_split_assignments(

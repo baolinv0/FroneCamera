@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import re
 from pathlib import Path
 from typing import Literal
@@ -166,5 +167,11 @@ class TMQAConfig(BaseModel):
 
 
 def load_config(path: Path) -> TMQAConfig:
-    data = yaml.safe_load(path.read_text(encoding="utf-8"))
-    return TMQAConfig.model_validate(data)
+    return load_config_with_sha256(path)[0]
+
+
+def load_config_with_sha256(path: Path) -> tuple[TMQAConfig, str]:
+    """Parse and hash one byte snapshot, so a later file change cannot relabel the policy."""
+    payload = path.read_bytes()
+    data = yaml.safe_load(payload.decode("utf-8"))
+    return TMQAConfig.model_validate(data), hashlib.sha256(payload).hexdigest()

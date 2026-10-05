@@ -10,7 +10,7 @@ import numpy as np
 from PIL import Image
 
 from .audit import audit_verified_experiment, build_requirement_records
-from .config import CalibrationPolicyConfig, load_config
+from .config import CalibrationPolicyConfig, load_config, load_config_with_sha256
 from .dataset import discover_scenes
 from .domain import HumanReview, ReliabilityResult, SceneEvaluation
 from .evaluation import EvaluationPipeline
@@ -22,6 +22,7 @@ from .lineage import (
     load_evaluation_run_manifest,
     load_split_assignments,
     require_matching_evaluation_config,
+    require_matching_scene_evaluations,
     write_evaluation_run_manifest,
 )
 from .pseudo_gt import select_scene_pseudo_gt
@@ -131,7 +132,7 @@ def _attach_sources(specs, source_root: Path | None):
 def evaluate_command(
     root: Path, output: Path, config_path: Path, source_root: Path | None = None
 ) -> None:
-    config = load_config(config_path)
+    config, config_sha = load_config_with_sha256(config_path)
     specs = _attach_sources(discover_scenes(root, config.dataset), source_root)
     pipeline = EvaluationPipeline(config)
     scenes = [pipeline.evaluate_scene(spec) for spec in specs]
@@ -139,7 +140,9 @@ def evaluate_command(
     _write_evaluations(output / "evaluations.json", scenes)
     write_evaluation_run_manifest(
         output / "evaluation_run_manifest.json",
-        build_evaluation_run_manifest(specs, config_path, config),
+        build_evaluation_run_manifest(
+            specs, config_path, config, evaluations=scenes, config_sha256=config_sha
+        ),
     )
     decisions = {key: 0 for key in ["KEEP", "REGENERATE", "REVIEW", "REJECT"]}
     for scene in scenes:
@@ -384,7 +387,7 @@ def select_candidates_command(
     splits_path: Path,
     output: Path,
 ) -> None:
-    config = load_config(config_path)
+    config, config_sha = load_config_with_sha256(config_path)
     specs = _attach_sources(discover_scenes(root, config.dataset), source_root)
     scenes = _load_evaluations(results)
     spec_by_id = {spec.scene_id: spec for spec in specs}
@@ -393,9 +396,10 @@ def select_candidates_command(
     if {scene.scene_id for scene in scenes} != set(spec_by_id):
         raise ValueError("evaluations must cover the complete declared dataset")
     manifest = load_evaluation_run_manifest(run_manifest_path)
-    require_matching_evaluation_config(manifest, config_path)
+    require_matching_evaluation_config(manifest, config_path, config_sha256=config_sha)
     if dataset_manifest_sha256(specs) != manifest.dataset_manifest_sha256:
         raise ValueError("dataset bytes do not match evaluation manifest")
+    require_matching_scene_evaluations(manifest, scenes)
     assignments = load_split_assignments(splits_path, expected_scene_ids=set(spec_by_id))
     if set(assignments) != set(spec_by_id):
         raise ValueError("split metadata must be closed over the complete dataset")
