@@ -245,7 +245,13 @@ class HumanReview(BaseModel):
 class ReliabilityResult(BaseModel):
     model_id: str
     sample_count: int
+    overall_sample_count: int = Field(default=0, ge=0)
+    model_sources: list[Literal["real", "synthetic"]] = Field(default_factory=list)
+    model_source_counts: dict[str, int] = Field(default_factory=dict)
+    synthetic: bool = False
     overall_mae: float
     decision_agreement: float
     dimension_mae: dict[str, float]
     fusion_weight: float
+    fusion_weight_scope: Literal["research", "production"] = "research"
+    production_eligible: bool = False

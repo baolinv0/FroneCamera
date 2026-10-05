@@ -1,17 +1,52 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
+from pathlib import Path
 
 import httpx
 import numpy as np
 
 from .config import JudgeConfig, TMQAConfig
-from .domain import ModelEvaluation, SceneEvaluation, StageResult
-from .image_io import load_rgb
+from .domain import ImageManifestItem, ModelEvaluation, SceneEvaluation, SceneSpec, StageResult
+from .image_io import file_sha256, load_rgb
 from .judges.mock import MockJudge
 from .judges.openai_compatible import OpenAICompatibleJudge
 from .metrics import compute_objective_metrics, compute_sequence_metrics
 from .prompts import PromptRegistry, build_input_manifest, render_prompt
+
+
+class _InputIntegrityError(ValueError):
+    """The scene no longer has the inputs used to calculate its evidence."""
+
+
+def _capture_input_hashes(scene: SceneSpec) -> dict[Path, str]:
+    paths = [scene.baseline_path, *(item.path for item in scene.alpha_images)]
+    if scene.source_path is not None:
+        paths.append(scene.source_path)
+    try:
+        return {path: file_sha256(path) for path in dict.fromkeys(paths)}
+    except OSError as exc:
+        raise _InputIntegrityError(f"input integrity failure: {exc}") from exc
+
+
+def _assert_inputs_unchanged(hashes: Mapping[Path, str]) -> None:
+    for path, expected in hashes.items():
+        try:
+            actual = file_sha256(path)
+        except OSError as exc:
+            raise _InputIntegrityError(f"input integrity failure: {path}: {exc}") from exc
+        if actual != expected:
+            raise _InputIntegrityError(f"input integrity failure: source hash changed: {path}")
+
+
+def _assert_manifest_bound(
+    manifest: list[ImageManifestItem], hashes: Mapping[Path, str]
+) -> None:
+    for item in manifest:
+        if item.source_sha256 != hashes.get(Path(item.path)):
+            raise _InputIntegrityError(
+                f"input integrity failure: manifest source hash mismatch: {item.path}"
+            )
 
 
 def model_score_gap(evaluations: list[ModelEvaluation], dimension: str) -> float:
@@ -44,18 +79,27 @@ class EvaluationPipeline:
         self.registry = PromptRegistry.default()
 
     def evaluate_scene(self, scene) -> SceneEvaluation:
-        baseline = load_rgb(scene.baseline_path)
-        objective = []
-        for alpha_image in scene.alpha_images:
-            image = load_rgb(alpha_image.path)
-            objective.append(
-                compute_objective_metrics(
-                    image,
-                    alpha=alpha_image.alpha,
-                    level=alpha_image.level,
-                    baseline=baseline,
+        # Bind objective evidence and every judge trace to the same source bytes.
+        # Rechecking also covers an explicit objective baseline outside the manifest.
+        input_hashes = _capture_input_hashes(scene)
+        try:
+            input_manifest = build_input_manifest(scene)
+            baseline = load_rgb(scene.baseline_path)
+            objective = []
+            for alpha_image in scene.alpha_images:
+                image = load_rgb(alpha_image.path)
+                objective.append(
+                    compute_objective_metrics(
+                        image,
+                        alpha=alpha_image.alpha,
+                        level=alpha_image.level,
+                        baseline=baseline,
+                    )
                 )
-            )
+        except OSError as exc:
+            raise _InputIntegrityError(f"input integrity failure: {exc}") from exc
+        _assert_inputs_unchanged(input_hashes)
+        _assert_manifest_bound(input_manifest, input_hashes)
         sequence = compute_sequence_metrics(objective)
         evidence = {
             "max_clipping_ratio": max(item.clipping_ratio for item in objective),
@@ -67,27 +111,61 @@ class EvaluationPipeline:
             "endpoint_range_ev": sequence.endpoint_range_ev,
             "violation_rate": sequence.violation_rate,
         }
-        input_manifest = build_input_manifest(scene)
-
-        model_evaluations: list[ModelEvaluation] = []
+        prepared_judges = []
         for judge_config in self.config.judges:
             if not judge_config.enabled:
                 continue
-            trace = render_prompt(
-                registry=self.registry,
-                prompt_id=judge_config.prompt_id,
-                prompt_version=judge_config.prompt_version,
-                scene=scene,
-                model_role=judge_config.role,
-                objective_evidence=evidence,
-                inference_parameters={
-                    "temperature": judge_config.temperature,
-                    "max_tokens": judge_config.max_tokens,
-                    "model": judge_config.model,
-                },
-            )
+            try:
+                trace = render_prompt(
+                    registry=self.registry,
+                    prompt_id=judge_config.prompt_id,
+                    prompt_version=judge_config.prompt_version,
+                    scene=scene,
+                    model_role=judge_config.role,
+                    objective_evidence=evidence,
+                    inference_parameters={
+                        "temperature": judge_config.temperature,
+                        "max_tokens": judge_config.max_tokens,
+                        "model": judge_config.model,
+                    },
+                )
+            except OSError as exc:
+                raise _InputIntegrityError(f"input integrity failure: {exc}") from exc
+            _assert_inputs_unchanged(input_hashes)
+            _assert_manifest_bound(trace.input_manifest, input_hashes)
+            if trace.input_manifest != input_manifest:
+                raise _InputIntegrityError("input integrity failure: judge manifest changed")
+            prepared_judges.append((judge_config, trace))
+
+        model_evaluations: list[ModelEvaluation] = []
+        integrity_error = None
+        for judge_config, trace in prepared_judges:
+            if integrity_error is None:
+                try:
+                    _assert_inputs_unchanged(input_hashes)
+                except _InputIntegrityError as exc:
+                    integrity_error = str(exc)
+            if integrity_error is not None:
+                model_evaluations.append(
+                    ModelEvaluation(
+                        model_id=judge_config.id,
+                        model_role=judge_config.role,
+                        model_version=judge_config.version,
+                        synthetic=judge_config.synthetic,
+                        available=False,
+                        prompt_trace=trace,
+                        decision="REVIEW",
+                        confidence=0,
+                        error=integrity_error,
+                    )
+                )
+                continue
             judge = _judge_from_config(judge_config, self.transports.get(judge_config.id))
             model_evaluations.append(judge.evaluate(trace))
+            try:
+                _assert_inputs_unchanged(input_hashes)
+            except _InputIntegrityError as exc:
+                integrity_error = str(exc)
 
         max_clip = evidence["max_clipping_ratio"]
         min_edge = evidence["min_edge_similarity"]
@@ -104,7 +182,7 @@ class EvaluationPipeline:
             for issue in model.issues
             if issue.fatal
         ]
-        fatal = objective_fatal or bool(model_fatal_issues)
+        fatal = objective_fatal or bool(model_fatal_issues) or integrity_error is not None
         tone_score = float(
             np.clip(1 - max_clip - 0.25 * evidence["max_shadow_ratio"], 0, 1)
         )
@@ -163,6 +241,8 @@ class EvaluationPipeline:
             + max((issue.severity for issue in model_fatal_issues), default=0.0)
         )
         reasons: list[str] = []
+        if integrity_error is not None:
+            reasons.append("input_integrity_failure")
         if gap >= self.config.review.disagreement_threshold:
             reasons.append("model_disagreement")
         if decision_disagreement:
@@ -192,9 +272,9 @@ class EvaluationPipeline:
             StageResult(
                 stage_id="integrity",
                 label="Integrity",
-                status="PASS",
-                score=1.0,
-                evidence=[policy_evidence],
+                status="FAIL" if integrity_error is not None else "PASS",
+                score=0.0 if integrity_error is not None else 1.0,
+                evidence=[policy_evidence, *([integrity_error] if integrity_error else [])],
             ),
             StageResult(
                 stage_id="hard_gate",
@@ -246,7 +326,8 @@ class EvaluationPipeline:
                 label="Model judges",
                 status=(
                     "WARN"
-                    if not available_models
+                    if integrity_error is not None
+                    or not available_models
                     or unavailable_models
                     or decision_disagreement
                     or unanimous_decision in {"REJECT", "REGENERATE", "REVIEW"}

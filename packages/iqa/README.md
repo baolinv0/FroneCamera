@@ -172,3 +172,5 @@ qwen-tmqa --help
 The new `iqa-compare` entry point compares arbitrary algorithm outputs, preserving source precision, orientation, per-person ROIs and byte traces. `qwen-tmqa` retains its nine-alpha workflow and adds candidate selection and separate human-confirmed training export. See [the complete integration guide](../../docs/integration/QUICKSTART.md) for manifests and commands. Missing reference, human or calibration evidence remains explicit; proxy measurements do not become an absolute quality score.
 
 Candidate selection requires the result bindings written by the current `evaluate` command. Re-evaluate historical runs whose manifests lack these bindings. See [the standalone P1 fixes and test instructions](../../docs/integration/P1_FIXES_20261005.md) for the static review boundary and result/configuration pairing checks.
+
+The [standalone P2 fixes and test instructions](../../docs/integration/P2_FIXES_20261005.md) cover stable asset paths, changing inputs, declared score units, strict split metadata, per-model calibration eligibility, bounded NPY decoding and semantic audit checks. Regenerate old evaluation/dashboard artifacts after upgrading.

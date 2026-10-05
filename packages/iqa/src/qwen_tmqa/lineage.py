@@ -243,12 +243,20 @@ def load_split_assignments(
         canonical_splits: dict[str, str] = {}
         group_splits: dict[str, str] = {}
         for row in reader:
-            scene_id = str(row.get("scene_id", "")).strip()
-            split = str(row.get("split", "")).strip()
-            canonical = str(row.get("canonical_scene_id", "")).strip()
-            group = str(row.get("group_id", "")).strip()
-            if not scene_id:
-                raise ValueError("split file contains empty scene_id")
+            if None in row:
+                raise ValueError(f"split file row {reader.line_num} contains extra columns")
+            invalid_fields = sorted(
+                field for field in required if row.get(field) is None or not row[field].strip()
+            )
+            if invalid_fields:
+                raise ValueError(
+                    f"split file row {reader.line_num} contains missing or blank required cells: "
+                    f"{', '.join(invalid_fields)}"
+                )
+            scene_id = row["scene_id"].strip()
+            split = row["split"].strip()
+            canonical = row["canonical_scene_id"].strip()
+            group = row["group_id"].strip()
             if scene_id in assignments:
                 raise ValueError(f"duplicate scene_id in split file: {scene_id}")
             try:

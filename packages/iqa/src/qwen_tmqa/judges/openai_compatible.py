@@ -5,13 +5,14 @@ import json
 import math
 import re
 import time
+from pathlib import Path
 
 import httpx
 
 from ..candidate_schema import CandidatePreferenceEvidence, validate_candidate_preference_payload
 from ..config import JudgeConfig
 from ..domain import ModelEvaluation, ModelIssue, PromptTrace
-from ..image_io import encode_image_payload
+from ..image_io import encode_image_payload, file_sha256
 
 _JSON_FENCE = re.compile(r"```(?:json)?\s*(.*?)\s*```", re.DOTALL | re.IGNORECASE)
 _REQUIRED_SCORE_KEYS = {
@@ -29,6 +30,7 @@ _REQUIRED_RESPONSE_KEYS = {
     "issues",
     "rationale",
 }
+_PERCENT_SCORE_SCHEMAS = {"tmqa.sequence.v4", "tmqa.sequence.v5"}
 
 
 def _image_data_url(path: str, width: int | None, height: int | None) -> str:
@@ -58,6 +60,12 @@ class OpenAICompatibleJudge:
     def _request(self, prompt_trace: PromptTrace) -> str:
         content: list[dict[str, object]] = [{"type": "text", "text": prompt_trace.rendered_prompt}]
         for item in prompt_trace.input_manifest:
+            source_hash = file_sha256(Path(item.path))
+            if source_hash != item.source_sha256:
+                raise ValueError(
+                    f"image source hash mismatch for image {item.index}: "
+                    f"trace={item.source_sha256}, actual={source_hash}"
+                )
             payload = encode_image_payload(item.path, item.sent_width, item.sent_height)
             if item.payload_sha256 and payload.sha256 != item.payload_sha256:
                 raise ValueError(
@@ -197,15 +205,23 @@ class OpenAICompatibleJudge:
             rationale = parsed["rationale"]
             if not isinstance(rationale, str) or not rationale.strip():
                 raise ValueError("rationale must be a non-empty string")
+            # These schemas declare six scores and confidence in [0,100],
+            # including values <= 1. Convert only at the provider boundary,
+            # keeping the original parsed payload and candidate [0,1] fields.
+            # Historical v3 did not declare units; retain its legacy domain
+            # normalization for compatibility with existing provider responses.
+            score_divisor = (
+                100.0 if prompt_trace.output_schema_version in _PERCENT_SCORE_SCHEMAS else 1.0
+            )
             return ModelEvaluation(
                 model_id=self.config.id,
                 model_role=self.config.role,
                 model_version=self.config.version,
                 synthetic=self.config.synthetic,
                 prompt_trace=prompt_trace,
-                scores=dict(score_payload),
+                scores={key: value / score_divisor for key, value in score_payload.items()},
                 decision=parsed["decision"],
-                confidence=parsed["confidence"],
+                confidence=parsed["confidence"] / score_divisor,
                 issues=issues,
                 rationale=rationale,
                 raw_response=raw,

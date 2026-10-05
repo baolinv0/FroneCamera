@@ -109,9 +109,24 @@ def calibrate_models(
         review_type=review_type,
         allow_synthetic=allow_synthetic,
     )
-    scene_by_id = {scene.scene_id: scene for scene in scenes}
+    scene_by_id: dict[str, SceneEvaluation] = {}
+    for scene in scenes:
+        if scene.scene_id in scene_by_id:
+            raise ValueError(f"duplicate scene_id {scene.scene_id!r} in calibration results")
+        model_ids: set[str] = set()
+        for model in scene.model_evaluations:
+            if model.model_id in model_ids:
+                raise ValueError(
+                    f"duplicate model_id {model.model_id!r} in scene {scene.scene_id!r}"
+                )
+            model_ids.add(model.model_id)
+        scene_by_id[scene.scene_id] = scene
     latest_by_reviewer: dict[tuple[str, str], HumanReview] = {}
+    review_ids: set[str] = set()
     for review in selected_reviews:
+        if review.review_id in review_ids:
+            raise ValueError(f"duplicate review_id {review.review_id!r} in calibration reviews")
+        review_ids.add(review.review_id)
         key = (review.scene_id, review.reviewer_id)
         current = latest_by_reviewer.get(key)
         review_time = datetime.fromisoformat(review.received_at.replace("Z", "+00:00"))
@@ -126,6 +141,7 @@ def calibrate_models(
     absolute_errors: dict[str, list[float]] = defaultdict(list)
     decision_matches: dict[str, list[float]] = defaultdict(list)
     dimension_errors: dict[str, dict[str, list[float]]] = defaultdict(lambda: defaultdict(list))
+    model_source_counts: dict[str, dict[str, int]] = defaultdict(lambda: defaultdict(int))
     for review in latest_by_reviewer.values():
         scene = scene_by_id.get(review.scene_id)
         if scene is None:
@@ -134,6 +150,8 @@ def calibrate_models(
         for model in scene.model_evaluations:
             if not model.available:
                 continue
+            source = "synthetic" if model.synthetic else "real"
+            model_source_counts[model.model_id][source] += 1
             model_overall = model.scores.get("overall")
             if human_overall is not None and model_overall is not None:
                 absolute_errors[model.model_id].append(abs(model_overall - human_overall))
@@ -157,6 +175,10 @@ def calibrate_models(
             ReliabilityResult(
                 model_id=model_id,
                 sample_count=max(len(errors), len(decision_matches.get(model_id, []))),
+                overall_sample_count=len(errors),
+                model_sources=sorted(model_source_counts[model_id]),
+                model_source_counts=dict(sorted(model_source_counts[model_id].items())),
+                synthetic="synthetic" in model_source_counts[model_id],
                 overall_mae=float(np.mean(errors)) if errors else 1.0,
                 decision_agreement=float(np.mean(decision_matches[model_id]))
                 if decision_matches.get(model_id)

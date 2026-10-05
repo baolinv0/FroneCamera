@@ -2,9 +2,16 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
+import re
 from pathlib import Path
 from typing import Any
 
+from pydantic import ValidationError
+
+from .domain import ImageManifestItem, ModelEvaluation
+
+_SHA256 = re.compile(r"[0-9a-f]{64}")
 _REQUIRED_LEVELS = {
     "a_m100",
     "a_m075",
@@ -65,15 +72,120 @@ def _load_json(path: Path) -> Any:
 
 
 def _successful_behavior(evidence: dict[str, Any], name: str) -> bool:
-    check = evidence.get("checks", {}).get(name, {})
+    check = _mapping(_mapping(evidence.get("checks")).get(name))
     digest = check.get("output_sha256")
+    output = check.get("output")
     return (
         isinstance(check.get("command"), str)
-        and bool(check["command"])
+        and bool(check["command"].strip())
+        and type(check.get("exit_code")) is int
         and check.get("exit_code") == 0
-        and isinstance(digest, str)
-        and len(digest) == 64
+        and _valid_sha256(digest)
+        and isinstance(output, str)
+        and hashlib.sha256(output.encode("utf-8")).hexdigest() == digest
     )
+
+
+def _valid_sha256(value: object) -> bool:
+    return isinstance(value, str) and _SHA256.fullmatch(value) is not None
+
+
+def _mapping(value: object) -> dict[str, Any]:
+    return value if isinstance(value, dict) else {}
+
+
+def _model_trace(model: dict[str, Any]) -> dict[str, Any]:
+    return _mapping(model.get("prompt_trace"))
+
+
+def _finite_number(value: object, minimum: float = 0, maximum: float | None = None) -> bool:
+    if type(value) not in (int, float) or value < minimum:
+        return False
+    if maximum is not None and value > maximum:
+        return False
+    try:
+        return math.isfinite(value)
+    except OverflowError:
+        return False
+
+
+def _valid_model_contract(model: dict[str, Any]) -> bool:
+    required = {
+        "model_id", "model_role", "model_version", "synthetic", "available",
+        "scores", "decision", "confidence", "issues", "rationale", "raw_response",
+        "parsed_response", "latency_ms", "prompt_trace",
+    }
+    if not required <= set(model):
+        return False
+    if (
+        any(not isinstance(model[key], str) or not model[key].strip()
+            for key in ("model_id", "model_version"))
+        or type(model["available"]) is not bool
+        or type(model["synthetic"]) is not bool
+        or not _finite_number(model["latency_ms"])
+        or not _finite_number(model["confidence"], maximum=1)
+        or not isinstance(model["scores"], dict)
+        or any(not _finite_number(value, maximum=1) for value in model["scores"].values())
+        or not isinstance(model["parsed_response"], dict)
+    ):
+        return False
+    if model["available"]:
+        if (
+            set(model["scores"]) != _REQUIRED_SCORES
+            or any(not isinstance(model[key], str) or not model[key].strip()
+                   for key in ("rationale", "raw_response"))
+            or not model["parsed_response"]
+        ):
+            return False
+    elif not isinstance(model.get("error"), str) or not model["error"].strip():
+        return False
+    try:
+        ModelEvaluation.model_validate_json(json.dumps(model, allow_nan=False), strict=True)
+    except (ValidationError, ValueError, TypeError):
+        return False
+    return True
+
+
+def _valid_trace(trace: dict[str, Any]) -> bool:
+    return (
+        all(isinstance(trace.get(key), str) and bool(trace[key].strip()) for key in (
+            "prompt_id", "prompt_version", "template", "rendered_prompt", "output_schema_version"
+        ))
+        and isinstance(trace.get("variables"), dict)
+        and isinstance(trace.get("inference_parameters"), dict)
+        and _valid_sha256(trace.get("prompt_hash"))
+        and hashlib.sha256(trace["rendered_prompt"].encode("utf-8")).hexdigest()
+        == trace["prompt_hash"]
+    )
+
+
+def _valid_image_manifest(items: object) -> bool:
+    if not isinstance(items, list) or not items:
+        return False
+    for index, item in enumerate(items, start=1):
+        if not isinstance(item, dict):
+            return False
+        if (
+            type(item.get("index")) is not int or item["index"] != index
+            or any(not _valid_sha256(item.get(key)) for key in (
+                "sha256", "source_sha256", "payload_sha256"
+            ))
+            or item["sha256"] != item["source_sha256"]
+            or any(type(item.get(key)) is not int or item[key] <= 0
+                   for key in ("width", "height", "sent_width", "sent_height"))
+            or item.get("payload_mime") != "image/jpeg"
+            or not isinstance(item.get("payload_encoding"), dict)
+        ):
+            return False
+        encoding = item["payload_encoding"]
+        if (encoding.get("format") != "JPEG" or type(encoding.get("quality")) is not int
+                or not 0 <= encoding["quality"] <= 100):
+            return False
+        try:
+            ImageManifestItem.model_validate_json(json.dumps(item, allow_nan=False), strict=True)
+        except (ValidationError, ValueError, TypeError):
+            return False
+    return True
 
 
 def build_requirement_records(
@@ -197,17 +309,7 @@ def audit_verified_experiment(
         and model.get("prompt_trace")
         for model in models
     )
-    r4 = bool(models) and all(
-        (not model.get("available"))
-        or (
-            _REQUIRED_SCORES <= set(model.get("scores", {}))
-            and model.get("decision")
-            in {"KEEP", "REGENERATE", "REVIEW", "REJECT"}
-            and "confidence" in model
-            and "issues" in model
-        )
-        for model in models
-    )
+    r4 = bool(models) and all(_valid_model_contract(model) for model in models)
     trace_keys = {
         "prompt_id",
         "prompt_version",
@@ -220,25 +322,17 @@ def audit_verified_experiment(
         "inference_parameters",
     }
     r5 = bool(models) and all(
-        trace_keys <= set(model.get("prompt_trace", {})) for model in models
-    )
-    manifest_items = [
-        item
+        trace_keys <= set(_model_trace(model))
+        and _valid_trace(_model_trace(model))
         for model in models
-        for item in model.get("prompt_trace", {}).get("input_manifest", [])
-    ]
-    r6 = bool(manifest_items) and all(
-        item.get("source_sha256")
-        and item.get("payload_sha256")
-        and item.get("payload_mime")
-        and item.get("payload_encoding")
-        and item.get("sent_width")
-        and item.get("sent_height")
-        for item in manifest_items
+    )
+    r6 = bool(models) and all(
+        _valid_image_manifest(_model_trace(model).get("input_manifest"))
+        for model in models
     )
     r7 = bool(models) and all(
-        model.get("prompt_trace", {}).get("prompt_version") == "3.3"
-        and model.get("prompt_trace", {}).get("output_schema_version")
+        _model_trace(model).get("prompt_version") == "3.3"
+        and _model_trace(model).get("output_schema_version")
         == "tmqa.sequence.v4"
         for model in models
     )
@@ -374,7 +468,8 @@ def audit_verified_experiment(
         and reveal_path.exists()
         and queue_path.exists()
         and evidence.get("schema_version") == "tmqa.verification-evidence.v1"
-        and required_behavior_names <= set(evidence.get("checks", {}))
+        and required_behavior_names <= set(_mapping(evidence.get("checks")))
+        and all(_successful_behavior(evidence, name) for name in required_behavior_names)
     )
     ci = evidence.get("ci", {})
     artifacts = evidence.get("artifacts", {})

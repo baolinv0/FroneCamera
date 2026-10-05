@@ -235,29 +235,64 @@ def calibrate_command(
         if config_path is not None
         else CalibrationPolicyConfig()
     )
-    experimental = selected_type == "synthetic"
-    actual_sample_count = max(
-        (item.sample_count for item in reliability),
+    synthetic_reviews = selected_type == "synthetic"
+    synthetic_models = any(item.synthetic for item in reliability)
+    model_sources = {source for item in reliability for source in item.model_sources}
+    experimental = synthetic_reviews or synthetic_models
+    weighted_models = [item for item in reliability if item.fusion_weight > 0]
+    # A weight is learned from paired overall scores, not decision-only evidence.
+    # Every recommended model must meet the minimum; the largest count cannot
+    # qualify another model's sparse weight.
+    actual_sample_count = min(
+        (item.overall_sample_count for item in weighted_models),
         default=0,
     )
     sufficient = (
         selected_type == "real"
+        and bool(weighted_models)
         and actual_sample_count >= calibration_policy.minimum_real_sample_count
     )
-    production_eligible = selected_type == "real" and sufficient
+    production_eligible = sufficient and not experimental
+    weight_scope = "production" if production_eligible else "research"
+    reliability = [
+        item.model_copy(
+            update={
+                "fusion_weight_scope": weight_scope if item.fusion_weight > 0 else "research",
+                "production_eligible": production_eligible and item.fusion_weight > 0,
+            }
+        )
+        for item in reliability
+    ]
     if experimental:
-        warning = "Synthetic calibration is experimental and not a production weight."
-    elif not sufficient:
+        sources = []
+        if synthetic_reviews:
+            sources.append("synthetic reviews")
+        if synthetic_models:
+            sources.append("synthetic model evidence")
         warning = (
-            "Insufficient real blind-review samples "
-            f"({actual_sample_count}/{calibration_policy.minimum_real_sample_count}); "
-            "calibration is not production-ready."
+            f"Calibration includes {' and '.join(sources)}; weights are experimental "
+            "research weights and not a production weight."
+        )
+    elif not sufficient:
+        insufficient_models = [
+            f"{item.model_id}={item.overall_sample_count}/"
+            f"{calibration_policy.minimum_real_sample_count}"
+            for item in weighted_models
+            if item.overall_sample_count < calibration_policy.minimum_real_sample_count
+        ]
+        sample_detail = ", ".join(insufficient_models) or "no paired overall-score samples"
+        warning = (
+            "Insufficient real blind-review samples per weighted model "
+            f"({sample_detail}); calibration weights are for research "
+            "and are not production-ready."
         )
     else:
         warning = "Human calibration applies only to the selected blind-review set."
     payload = {
         "models": [item.model_dump(mode="json") for item in reliability],
-        "synthetic_reviews": experimental,
+        "synthetic_reviews": synthetic_reviews,
+        "synthetic_models": synthetic_models,
+        "mixed_model_sources": len(model_sources) > 1,
         "selected_review_type": selected_type,
         "selected_review_count": len(selected),
         "ignored_review_count": ignored_count,
@@ -265,11 +300,24 @@ def calibrate_command(
         "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "experimental": experimental,
         "production_eligible": production_eligible,
+        "fusion_weight_scope": weight_scope,
         "sample_sufficiency": {
             "policy_version": calibration_policy.version,
             "actual_sample_count": actual_sample_count,
             "minimum_real_sample_count": calibration_policy.minimum_real_sample_count,
             "sufficient": sufficient,
+            "sample_count_basis": "paired_overall_scores",
+            "rule": "every_weighted_model",
+            "per_model": {
+                item.model_id: {
+                    "actual_sample_count": item.overall_sample_count,
+                    "minimum_real_sample_count": calibration_policy.minimum_real_sample_count,
+                    "sufficient": selected_type == "real"
+                    and item.overall_sample_count >= calibration_policy.minimum_real_sample_count,
+                    "weighted": item.fusion_weight > 0,
+                }
+                for item in reliability
+            },
         },
         "warning": warning,
         "pairwise_mean_gap": pairwise_mean_gaps(scenes),

@@ -56,6 +56,8 @@ qwen-tmqa export-training --candidates results/candidates/candidate_suggestions.
 
 Keep `evaluations.json` and `evaluation_run_manifest.json` from the same evaluation together. Candidate selection verifies each scene's result digest as well as the configuration and input images. Historical manifests without result bindings require a fresh evaluation; do not retrofit them using a separately supplied results file. See [the two P1 fixes and regression instructions](P1_FIXES_20261005.md).
 
+See [the eight P2 fixes and regression instructions](P2_FIXES_20261005.md) for stable dashboard assets, input consistency, score units, split validation, calibration eligibility, NPY limits and audit evidence checks. Regenerate evaluation/dashboard artifacts when upgrading; calibration weights explicitly indicate research or production scope.
+
 `splits.csv` requires `scene_id,canonical_scene_id,group_id,split` covering every dataset scene. Canonical/group derivatives must stay in one split. The default mock configuration creates demonstration suggestions that cannot pass formal training admission. Use real distinct Judge evidence and a separately collected human confirmation for production labels. Generic non-alpha pipelines can call `TrainingCandidate` and `export_training_data`; the same source/candidate-byte, split, group, Judge, human and label-scope gates apply. The exporter authenticates neither reviewer identity nor the candidate-generation process.
 
 Representative auditing is separate from targeted risky cases:

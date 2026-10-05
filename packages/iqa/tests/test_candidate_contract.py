@@ -25,6 +25,9 @@ def response():
 def evaluate(tmp_path, payload, version="3.4"):
     trace = _trace(_spec(tmp_path))
     trace.prompt_version = version
+    trace.output_schema_version = (
+        PromptRegistry.default().get("tmqa.sequence", version).output_schema_version
+    )
     config = JudgeConfig(
         id="judge",
         role="primary",

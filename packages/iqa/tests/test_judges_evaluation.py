@@ -144,7 +144,7 @@ def test_openai_adapter_normalizes_prompt_documented_100_point_scores(
     trace = render_prompt(
         registry=PromptRegistry.default(),
         prompt_id="tmqa.sequence",
-        prompt_version="3.2",
+        prompt_version="3.3",
         scene=scene,
         model_role="primary",
         objective_evidence={},

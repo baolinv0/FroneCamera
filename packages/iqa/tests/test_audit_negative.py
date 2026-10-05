@@ -40,7 +40,8 @@ def _write_behavioral_evidence(path: Path, results_path: Path) -> None:
         key: {
             "command": f"pytest::{key}",
             "exit_code": 0,
-            "output_sha256": key.encode().hex().ljust(64, "0")[:64],
+            "output": f"fixture output for {key}\n",
+            "output_sha256": hashlib.sha256(f"fixture output for {key}\n".encode()).hexdigest(),
         }
         for key in [
             "fatal_non_compensation",

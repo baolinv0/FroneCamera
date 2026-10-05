@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
+import ast
 import hashlib
 import io
+import math
+import os
 import struct
 from dataclasses import dataclass
 
@@ -47,17 +50,129 @@ class AssetDecodeError(ValueError):
         self.trace = trace
 
 
+# Per-asset allocation ceilings, independent of pixel quality. The decode
+# estimate includes the source/raw channels and normalization/hash temporaries.
+NUMPY_MAX_SOURCE_BYTES = 512 * 1024 * 1024
+NUMPY_DECODE_MEMORY_BUDGET_BYTES = 512 * 1024 * 1024
+NUMPY_MAX_HEADER_BYTES = 10000
+
+
+def _read_numpy_snapshot(asset: ComparisonAsset, trace: dict[str, object]) -> bytes:
+    """Keep one descriptor and cap reads even if the file grows after fstat."""
+    with asset.path.open("rb") as stream:
+        size = os.fstat(stream.fileno()).st_size
+        trace["byte_count"] = size
+        trace["numpy_source_bytes_budget"] = NUMPY_MAX_SOURCE_BYTES
+        trace["source_snapshot_complete"] = False
+        if size > NUMPY_MAX_SOURCE_BYTES:
+            # No bytes were read, so no source hash can be asserted.
+            raise ValueError("numpy_source_bytes_budget_exceeded")
+        data = stream.read(size + 1)
+        trace["byte_count"] = len(data)
+        if len(data) > size or stream.read(1):
+            raise ValueError("numpy_source_size_changed_during_read")
+        trace.update(
+            source_bytes_sha256=hashlib.sha256(data).hexdigest(),
+            source_snapshot_complete=True,
+        )
+        return data
+
+
+def _validate_pixel_layout(shape: tuple[int, ...], dtype: np.dtype) -> None:
+    if (
+        len(shape) not in (2, 3)
+        or any(type(n) is not int or n <= 0 for n in shape)
+        or (len(shape) == 3 and shape[2] not in (3, 4))
+    ):
+        raise ValueError("image_requires_nonempty_gray_or_rgb")
+    if dtype.hasobject or dtype.kind not in ("u", "f") or dtype.itemsize > 8:
+        raise ValueError("unsupported_pixel_dtype")
+    if dtype.kind == "u" and dtype.itemsize not in (1, 2):
+        raise ValueError("unsupported_integer_precision")
+
+
+def _preflight_numpy(data: bytes, trace: dict[str, object]) -> None:
+    """Validate the bounded header and exact payload before NumPy allocates."""
+    stream = io.BytesIO(data)
+    version = np.lib.format.read_magic(stream)
+    if version not in ((1, 0), (2, 0), (3, 0)):
+        raise ValueError("unsupported_numpy_header_version")
+    length_format = "<H" if version == (1, 0) else "<I"
+    length_size = struct.calcsize(length_format)
+    length_offset = stream.tell()
+    if len(data) < length_offset + length_size:
+        raise ValueError("truncated_numpy_header")
+    header_length = struct.unpack_from(length_format, data, length_offset)[0]
+    if header_length > NUMPY_MAX_HEADER_BYTES:
+        raise ValueError("numpy_header_bytes_budget_exceeded")
+    payload_offset = length_offset + length_size + header_length
+    if payload_offset > len(data):
+        raise ValueError("truncated_numpy_header")
+    try:
+        if version == (3, 0):
+            # NumPy exposes public v1/v2 header readers only. V3 changes the
+            # header encoding to UTF-8; parse its bounded literal directly.
+            header = ast.literal_eval(
+                data[length_offset + length_size : payload_offset].decode("utf-8")
+            )
+            if not isinstance(header, dict) or header.keys() != {"shape", "descr", "fortran_order"}:
+                raise ValueError("invalid_numpy_header_keys")
+            shape = header["shape"]
+            if not isinstance(shape, tuple) or any(type(n) is not int for n in shape):
+                raise ValueError("invalid_numpy_shape")
+            if type(header["fortran_order"]) is not bool:
+                raise ValueError("invalid_numpy_fortran_order")
+            dtype = np.lib.format.descr_to_dtype(header["descr"])
+        else:
+            reader = (
+                np.lib.format.read_array_header_1_0
+                if version == (1, 0)
+                else np.lib.format.read_array_header_2_0
+            )
+            shape, _fortran_order, dtype = reader(stream, max_header_size=NUMPY_MAX_HEADER_BYTES)
+    except (TypeError, IndexError, RecursionError) as exc:
+        raise ValueError("invalid_numpy_header") from exc
+    trace.update(
+        raw_shape=list(shape),
+        dtype=str(dtype),
+        numpy_header_version=list(version),
+        numpy_memory_budget_bytes=NUMPY_DECODE_MEMORY_BUDGET_BYTES,
+    )
+    _validate_pixel_layout(shape, dtype)
+    height, width = shape[:2]
+    pixel_count = height * width
+    # Match Pillow's existing decompression-bomb error ceiling without changing
+    # its warning threshold or any guard on ordinary image decoders.
+    if Image.MAX_IMAGE_PIXELS is not None and pixel_count > 2 * Image.MAX_IMAGE_PIXELS:
+        raise ValueError("numpy_decoded_pixel_budget_exceeded")
+    raw_bytes = math.prod(shape) * dtype.itemsize
+    expanded_raw_bytes = pixel_count * 3 * dtype.itemsize if len(shape) == 2 else raw_bytes
+    predicted_bytes = raw_bytes + expanded_raw_bytes + pixel_count * 3 * 8 * 3
+    trace["numpy_predicted_decode_bytes"] = predicted_bytes
+    if predicted_bytes > NUMPY_DECODE_MEMORY_BUDGET_BYTES:
+        raise ValueError("numpy_decode_memory_budget_exceeded")
+    if len(data) - payload_offset != raw_bytes:
+        raise ValueError("numpy_payload_length_mismatch")
+
+
 def load_comparison_asset(asset: ComparisonAsset) -> LoadedComparisonAsset:
-    data = asset.path.read_bytes()
     trace: dict[str, object] = {
         "asset_id": asset.id,
         "path": str(asset.path),
-        "source_bytes_sha256": hashlib.sha256(data).hexdigest(),
-        "byte_count": len(data),
+        "source_bytes_sha256": None,
+        "byte_count": None,
         "encoding": asset.encoding,
         "declared_source_sha256": asset.source_sha256,
     }
     try:
+        if asset.path.suffix.lower() == ".npy":
+            data = _read_numpy_snapshot(asset, trace)
+        else:
+            data = asset.path.read_bytes()
+            trace.update(
+                source_bytes_sha256=hashlib.sha256(data).hexdigest(),
+                byte_count=len(data),
+            )
         return _decode(asset, data, trace)
     except (
         Image.DecompressionBombError,
@@ -68,6 +183,7 @@ def load_comparison_asset(asset: ComparisonAsset) -> LoadedComparisonAsset:
         RuntimeError,
         cv2.error,
         OverflowError,
+        MemoryError,
     ) as exc:
         raise AssetDecodeError(str(exc), trace) from exc
 
@@ -125,6 +241,7 @@ def _decode(asset: ComparisonAsset, data: bytes, trace: dict[str, object]) -> Lo
     source_bit_depth = None
     warnings: list[str] = []
     if asset.path.suffix.lower() == ".npy":
+        _preflight_numpy(data, trace)
         raw = np.load(io.BytesIO(data), allow_pickle=False)
         decoder = "numpy_safe"
         if not isinstance(raw, np.ndarray):
@@ -173,15 +290,10 @@ def _decode(asset: ComparisonAsset, data: bytes, trace: dict[str, object]) -> Lo
     )
     if orientation not in range(1, 9):
         raise ValueError("unsupported_exif_orientation")
+    _validate_pixel_layout(raw.shape, raw.dtype)
     if raw.ndim == 2:
         raw = np.repeat(raw[..., None], 3, axis=2)
-    if raw.ndim != 3 or raw.shape[2] not in (3, 4) or min(raw.shape[:2]) == 0:
-        raise ValueError("image_requires_nonempty_gray_or_rgb")
     dtype = str(raw.dtype)
-    if raw.dtype.kind not in ("u", "f") or raw.dtype.itemsize > 8:
-        raise ValueError("unsupported_pixel_dtype")
-    if raw.dtype.kind == "u" and raw.dtype.itemsize not in (1, 2):
-        raise ValueError("unsupported_integer_precision")
     if not np.isfinite(raw).all():
         raise ValueError("nonfinite_pixels")
     denominator = float(np.iinfo(raw.dtype).max) if raw.dtype.kind == "u" else 1.0
@@ -201,6 +313,7 @@ def _decode(asset: ComparisonAsset, data: bytes, trace: dict[str, object]) -> Lo
     return LoadedComparisonAsset(
         pixels,
         {
+            **trace,
             "asset_id": asset.id,
             "path": str(asset.path),
             "source_bytes_sha256": hashlib.sha256(data).hexdigest(),

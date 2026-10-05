@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import html
 import json
 import re
@@ -17,6 +18,13 @@ def _safe_name(value: str) -> str:
     return re.sub(r"[^A-Za-z0-9_.-]+", "_", value)
 
 
+def _scene_asset_name(scene_id: str) -> str:
+    # Hash the full identity before shortening its readable, URL-safe prefix.
+    digest = hashlib.sha256(scene_id.encode("utf-8")).hexdigest()
+    prefix = _safe_name(scene_id)[:80] or "scene"
+    return f"{prefix}-{digest}"
+
+
 def _scene_manifest(scene: SceneEvaluation):
     if scene.input_manifest:
         return scene.input_manifest
@@ -30,7 +38,7 @@ def _copy_visual_assets(scene: SceneEvaluation, output_dir: Path) -> dict[str, s
     manifest = _scene_manifest(scene)
     if not manifest:
         return visual_paths
-    scene_dir = output_dir / "assets" / "images" / _safe_name(scene.scene_id)
+    scene_dir = output_dir / "assets" / "images" / _scene_asset_name(scene.scene_id)
     scene_dir.mkdir(parents=True, exist_ok=True)
     baseline_array: np.ndarray | None = None
     baseline_key: str | None = None
@@ -143,6 +151,18 @@ def generate_dashboard(
 ) -> Path:
     if not scenes:
         raise ValueError("at least one scene evaluation is required")
+    seen_ids: set[str] = set()
+    for scene in scenes:
+        if scene.scene_id in seen_ids:
+            raise ValueError(f"duplicate scene_id: {scene.scene_id!r}")
+        seen_ids.add(scene.scene_id)
+        seen_indices: set[int] = set()
+        for item in _scene_manifest(scene):
+            if item.index in seen_indices:
+                raise ValueError(
+                    f"duplicate image index {item.index} in scene {scene.scene_id!r}"
+                )
+            seen_indices.add(item.index)
     output_dir.mkdir(parents=True, exist_ok=True)
     (output_dir / "data").mkdir(parents=True, exist_ok=True)
     engineering_scenes = [_scene_payload(scene, output_dir) for scene in scenes]
