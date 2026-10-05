@@ -1,0 +1,11 @@
+{
+  "scene_count": 6,
+  "decisions": {
+    "KEEP": 2,
+    "REGENERATE": 0,
+    "REVIEW": 3,
+    "REJECT": 1
+  },
+  "mean_score": 0.8157210859608802,
+  "synthetic_models": true
+}

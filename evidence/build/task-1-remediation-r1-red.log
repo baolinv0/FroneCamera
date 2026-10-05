@@ -1,0 +1,1105 @@
+.FFFFFFF.FFFFFFFFFFF.F.FF.F.F.                                           [100%]
+=================================== FAILURES ===================================
+________ test_tiff_orientation_once_preserves_source_precision[uint8-2] ________
+
+tmp_path = PosixPath('/tmp/pytest-of-root/pytest-210/test_tiff_orientation_once_pre1')
+orientation = 2, dtype = <class 'numpy.uint8'>
+
+    @pytest.mark.parametrize('orientation', range(1, 9))
+    @pytest.mark.parametrize('dtype', [np.uint8, np.uint16])
+    def test_tiff_orientation_once_preserves_source_precision(tmp_path, orientation, dtype):
+        # Distinct positions/adjacent 16-bit values expose rotations AND quantization.
+        raw = (np.arange(35).reshape(5, 7) + 1200).astype(dtype)
+        path = tmp_path / f'o-{orientation}-{np.dtype(dtype).name}.tiff'
+        Image.fromarray(raw).save(path, tiffinfo={274: orientation}, compression='raw')
+        loaded = load_comparison_asset(ComparisonAsset(id='tiff', path=path))
+        expected = np.repeat(oriented(raw, orientation)[..., None], 3, axis=2)
+>       np.testing.assert_array_equal(loaded.pixels, expected / np.iinfo(dtype).max)
+E       AssertionError: 
+E       Arrays are not equal
+E       
+E       Mismatched elements: 90 / 105 (85.7%)
+E       Max absolute difference among violations: 0.02352941
+E       Max relative difference among violations: 0.03409091
+E        ACTUAL: array([[[0.690196, 0.690196, 0.690196],
+E               [0.694118, 0.694118, 0.694118],
+E               [0.698039, 0.698039, 0.698039],...
+E        DESIRED: array([[[0.713725, 0.713725, 0.713725],
+E               [0.709804, 0.709804, 0.709804],
+E               [0.705882, 0.705882, 0.705882],...
+
+packages/iqa/tests/test_asset_io_remediation_r1.py:40: AssertionError
+________ test_tiff_orientation_once_preserves_source_precision[uint8-3] ________
+
+tmp_path = PosixPath('/tmp/pytest-of-root/pytest-210/test_tiff_orientation_once_pre2')
+orientation = 3, dtype = <class 'numpy.uint8'>
+
+    @pytest.mark.parametrize('orientation', range(1, 9))
+    @pytest.mark.parametrize('dtype', [np.uint8, np.uint16])
+    def test_tiff_orientation_once_preserves_source_precision(tmp_path, orientation, dtype):
+        # Distinct positions/adjacent 16-bit values expose rotations AND quantization.
+        raw = (np.arange(35).reshape(5, 7) + 1200).astype(dtype)
+        path = tmp_path / f'o-{orientation}-{np.dtype(dtype).name}.tiff'
+        Image.fromarray(raw).save(path, tiffinfo={274: orientation}, compression='raw')
+        loaded = load_comparison_asset(ComparisonAsset(id='tiff', path=path))
+        expected = np.repeat(oriented(raw, orientation)[..., None], 3, axis=2)
+>       np.testing.assert_array_equal(loaded.pixels, expected / np.iinfo(dtype).max)
+E       AssertionError: 
+E       Arrays are not equal
+E       
+E       Mismatched elements: 102 / 105 (97.1%)
+E       Max absolute difference among violations: 0.13333333
+E       Max relative difference among violations: 0.19318182
+E        ACTUAL: array([[[0.690196, 0.690196, 0.690196],
+E               [0.694118, 0.694118, 0.694118],
+E               [0.698039, 0.698039, 0.698039],...
+E        DESIRED: array([[[0.823529, 0.823529, 0.823529],
+E               [0.819608, 0.819608, 0.819608],
+E               [0.815686, 0.815686, 0.815686],...
+
+packages/iqa/tests/test_asset_io_remediation_r1.py:40: AssertionError
+________ test_tiff_orientation_once_preserves_source_precision[uint8-4] ________
+
+tmp_path = PosixPath('/tmp/pytest-of-root/pytest-210/test_tiff_orientation_once_pre3')
+orientation = 4, dtype = <class 'numpy.uint8'>
+
+    @pytest.mark.parametrize('orientation', range(1, 9))
+    @pytest.mark.parametrize('dtype', [np.uint8, np.uint16])
+    def test_tiff_orientation_once_preserves_source_precision(tmp_path, orientation, dtype):
+        # Distinct positions/adjacent 16-bit values expose rotations AND quantization.
+        raw = (np.arange(35).reshape(5, 7) + 1200).astype(dtype)
+        path = tmp_path / f'o-{orientation}-{np.dtype(dtype).name}.tiff'
+        Image.fromarray(raw).save(path, tiffinfo={274: orientation}, compression='raw')
+        loaded = load_comparison_asset(ComparisonAsset(id='tiff', path=path))
+        expected = np.repeat(oriented(raw, orientation)[..., None], 3, axis=2)
+>       np.testing.assert_array_equal(loaded.pixels, expected / np.iinfo(dtype).max)
+E       AssertionError: 
+E       Arrays are not equal
+E       
+E       Mismatched elements: 84 / 105 (80%)
+E       Max absolute difference among violations: 0.10980392
+E       Max relative difference among violations: 0.15909091
+E        ACTUAL: array([[[0.690196, 0.690196, 0.690196],
+E               [0.694118, 0.694118, 0.694118],
+E               [0.698039, 0.698039, 0.698039],...
+E        DESIRED: array([[[0.8     , 0.8     , 0.8     ],
+E               [0.803922, 0.803922, 0.803922],
+E               [0.807843, 0.807843, 0.807843],...
+
+packages/iqa/tests/test_asset_io_remediation_r1.py:40: AssertionError
+________ test_tiff_orientation_once_preserves_source_precision[uint8-5] ________
+
+tmp_path = PosixPath('/tmp/pytest-of-root/pytest-210/test_tiff_orientation_once_pre4')
+orientation = 5, dtype = <class 'numpy.uint8'>
+
+    @pytest.mark.parametrize('orientation', range(1, 9))
+    @pytest.mark.parametrize('dtype', [np.uint8, np.uint16])
+    def test_tiff_orientation_once_preserves_source_precision(tmp_path, orientation, dtype):
+        # Distinct positions/adjacent 16-bit values expose rotations AND quantization.
+        raw = (np.arange(35).reshape(5, 7) + 1200).astype(dtype)
+        path = tmp_path / f'o-{orientation}-{np.dtype(dtype).name}.tiff'
+        Image.fromarray(raw).save(path, tiffinfo={274: orientation}, compression='raw')
+        loaded = load_comparison_asset(ComparisonAsset(id='tiff', path=path))
+        expected = np.repeat(oriented(raw, orientation)[..., None], 3, axis=2)
+>       np.testing.assert_array_equal(loaded.pixels, expected / np.iinfo(dtype).max)
+E       AssertionError: 
+E       Arrays are not equal
+E       
+E       (shapes (5, 7, 3), (7, 5, 3) mismatch)
+E        ACTUAL: array([[[0.690196, 0.690196, 0.690196],
+E               [0.694118, 0.694118, 0.694118],
+E               [0.698039, 0.698039, 0.698039],...
+E        DESIRED: array([[[0.690196, 0.690196, 0.690196],
+E               [0.717647, 0.717647, 0.717647],
+E               [0.745098, 0.745098, 0.745098],...
+
+packages/iqa/tests/test_asset_io_remediation_r1.py:40: AssertionError
+________ test_tiff_orientation_once_preserves_source_precision[uint8-6] ________
+
+tmp_path = PosixPath('/tmp/pytest-of-root/pytest-210/test_tiff_orientation_once_pre5')
+orientation = 6, dtype = <class 'numpy.uint8'>
+
+    @pytest.mark.parametrize('orientation', range(1, 9))
+    @pytest.mark.parametrize('dtype', [np.uint8, np.uint16])
+    def test_tiff_orientation_once_preserves_source_precision(tmp_path, orientation, dtype):
+        # Distinct positions/adjacent 16-bit values expose rotations AND quantization.
+        raw = (np.arange(35).reshape(5, 7) + 1200).astype(dtype)
+        path = tmp_path / f'o-{orientation}-{np.dtype(dtype).name}.tiff'
+        Image.fromarray(raw).save(path, tiffinfo={274: orientation}, compression='raw')
+        loaded = load_comparison_asset(ComparisonAsset(id='tiff', path=path))
+        expected = np.repeat(oriented(raw, orientation)[..., None], 3, axis=2)
+>       np.testing.assert_array_equal(loaded.pixels, expected / np.iinfo(dtype).max)
+E       AssertionError: 
+E       Arrays are not equal
+E       
+E       (shapes (5, 7, 3), (7, 5, 3) mismatch)
+E        ACTUAL: array([[[0.823529, 0.823529, 0.823529],
+E               [0.819608, 0.819608, 0.819608],
+E               [0.815686, 0.815686, 0.815686],...
+E        DESIRED: array([[[0.8     , 0.8     , 0.8     ],
+E               [0.772549, 0.772549, 0.772549],
+E               [0.745098, 0.745098, 0.745098],...
+
+packages/iqa/tests/test_asset_io_remediation_r1.py:40: AssertionError
+________ test_tiff_orientation_once_preserves_source_precision[uint8-7] ________
+
+tmp_path = PosixPath('/tmp/pytest-of-root/pytest-210/test_tiff_orientation_once_pre6')
+orientation = 7, dtype = <class 'numpy.uint8'>
+
+    @pytest.mark.parametrize('orientation', range(1, 9))
+    @pytest.mark.parametrize('dtype', [np.uint8, np.uint16])
+    def test_tiff_orientation_once_preserves_source_precision(tmp_path, orientation, dtype):
+        # Distinct positions/adjacent 16-bit values expose rotations AND quantization.
+        raw = (np.arange(35).reshape(5, 7) + 1200).astype(dtype)
+        path = tmp_path / f'o-{orientation}-{np.dtype(dtype).name}.tiff'
+        Image.fromarray(raw).save(path, tiffinfo={274: orientation}, compression='raw')
+        loaded = load_comparison_asset(ComparisonAsset(id='tiff', path=path))
+        expected = np.repeat(oriented(raw, orientation)[..., None], 3, axis=2)
+>       np.testing.assert_array_equal(loaded.pixels, expected / np.iinfo(dtype).max)
+E       AssertionError: 
+E       Arrays are not equal
+E       
+E       (shapes (5, 7, 3), (7, 5, 3) mismatch)
+E        ACTUAL: array([[[0.690196, 0.690196, 0.690196],
+E               [0.694118, 0.694118, 0.694118],
+E               [0.698039, 0.698039, 0.698039],...
+E        DESIRED: array([[[0.823529, 0.823529, 0.823529],
+E               [0.796078, 0.796078, 0.796078],
+E               [0.768627, 0.768627, 0.768627],...
+
+packages/iqa/tests/test_asset_io_remediation_r1.py:40: AssertionError
+________ test_tiff_orientation_once_preserves_source_precision[uint8-8] ________
+
+tmp_path = PosixPath('/tmp/pytest-of-root/pytest-210/test_tiff_orientation_once_pre7')
+orientation = 8, dtype = <class 'numpy.uint8'>
+
+    @pytest.mark.parametrize('orientation', range(1, 9))
+    @pytest.mark.parametrize('dtype', [np.uint8, np.uint16])
+    def test_tiff_orientation_once_preserves_source_precision(tmp_path, orientation, dtype):
+        # Distinct positions/adjacent 16-bit values expose rotations AND quantization.
+        raw = (np.arange(35).reshape(5, 7) + 1200).astype(dtype)
+        path = tmp_path / f'o-{orientation}-{np.dtype(dtype).name}.tiff'
+        Image.fromarray(raw).save(path, tiffinfo={274: orientation}, compression='raw')
+        loaded = load_comparison_asset(ComparisonAsset(id='tiff', path=path))
+        expected = np.repeat(oriented(raw, orientation)[..., None], 3, axis=2)
+>       np.testing.assert_array_equal(loaded.pixels, expected / np.iinfo(dtype).max)
+E       AssertionError: 
+E       Arrays are not equal
+E       
+E       (shapes (5, 7, 3), (7, 5, 3) mismatch)
+E        ACTUAL: array([[[0.823529, 0.823529, 0.823529],
+E               [0.819608, 0.819608, 0.819608],
+E               [0.815686, 0.815686, 0.815686],...
+E        DESIRED: array([[[0.713725, 0.713725, 0.713725],
+E               [0.741176, 0.741176, 0.741176],
+E               [0.768627, 0.768627, 0.768627],...
+
+packages/iqa/tests/test_asset_io_remediation_r1.py:40: AssertionError
+_______ test_tiff_orientation_once_preserves_source_precision[uint16-2] ________
+
+tmp_path = PosixPath('/tmp/pytest-of-root/pytest-210/test_tiff_orientation_once_pre9')
+orientation = 2, dtype = <class 'numpy.uint16'>
+
+    @pytest.mark.parametrize('orientation', range(1, 9))
+    @pytest.mark.parametrize('dtype', [np.uint8, np.uint16])
+    def test_tiff_orientation_once_preserves_source_precision(tmp_path, orientation, dtype):
+        # Distinct positions/adjacent 16-bit values expose rotations AND quantization.
+        raw = (np.arange(35).reshape(5, 7) + 1200).astype(dtype)
+        path = tmp_path / f'o-{orientation}-{np.dtype(dtype).name}.tiff'
+        Image.fromarray(raw).save(path, tiffinfo={274: orientation}, compression='raw')
+        loaded = load_comparison_asset(ComparisonAsset(id='tiff', path=path))
+        expected = np.repeat(oriented(raw, orientation)[..., None], 3, axis=2)
+>       np.testing.assert_array_equal(loaded.pixels, expected / np.iinfo(dtype).max)
+E       AssertionError: 
+E       Arrays are not equal
+E       
+E       Mismatched elements: 90 / 105 (85.7%)
+E       Max absolute difference among violations: 9.15541314e-05
+E       Max relative difference among violations: 0.005
+E        ACTUAL: array([[[0.018311, 0.018311, 0.018311],
+E               [0.018326, 0.018326, 0.018326],
+E               [0.018341, 0.018341, 0.018341],...
+E        DESIRED: array([[[0.018402, 0.018402, 0.018402],
+E               [0.018387, 0.018387, 0.018387],
+E               [0.018372, 0.018372, 0.018372],...
+
+packages/iqa/tests/test_asset_io_remediation_r1.py:40: AssertionError
+_______ test_tiff_orientation_once_preserves_source_precision[uint16-3] ________
+
+tmp_path = PosixPath('/tmp/pytest-of-root/pytest-210/test_tiff_orientation_once_pre10')
+orientation = 3, dtype = <class 'numpy.uint16'>
+
+    @pytest.mark.parametrize('orientation', range(1, 9))
+    @pytest.mark.parametrize('dtype', [np.uint8, np.uint16])
+    def test_tiff_orientation_once_preserves_source_precision(tmp_path, orientation, dtype):
+        # Distinct positions/adjacent 16-bit values expose rotations AND quantization.
+        raw = (np.arange(35).reshape(5, 7) + 1200).astype(dtype)
+        path = tmp_path / f'o-{orientation}-{np.dtype(dtype).name}.tiff'
+        Image.fromarray(raw).save(path, tiffinfo={274: orientation}, compression='raw')
+        loaded = load_comparison_asset(ComparisonAsset(id='tiff', path=path))
+        expected = np.repeat(oriented(raw, orientation)[..., None], 3, axis=2)
+>       np.testing.assert_array_equal(loaded.pixels, expected / np.iinfo(dtype).max)
+E       AssertionError: 
+E       Arrays are not equal
+E       
+E       Mismatched elements: 102 / 105 (97.1%)
+E       Max absolute difference among violations: 0.00051881
+E       Max relative difference among violations: 0.02833333
+E        ACTUAL: array([[[0.018311, 0.018311, 0.018311],
+E               [0.018326, 0.018326, 0.018326],
+E               [0.018341, 0.018341, 0.018341],...
+E        DESIRED: array([[[0.01883 , 0.01883 , 0.01883 ],
+E               [0.018814, 0.018814, 0.018814],
+E               [0.018799, 0.018799, 0.018799],...
+
+packages/iqa/tests/test_asset_io_remediation_r1.py:40: AssertionError
+_______ test_tiff_orientation_once_preserves_source_precision[uint16-4] ________
+
+tmp_path = PosixPath('/tmp/pytest-of-root/pytest-210/test_tiff_orientation_once_pre11')
+orientation = 4, dtype = <class 'numpy.uint16'>
+
+    @pytest.mark.parametrize('orientation', range(1, 9))
+    @pytest.mark.parametrize('dtype', [np.uint8, np.uint16])
+    def test_tiff_orientation_once_preserves_source_precision(tmp_path, orientation, dtype):
+        # Distinct positions/adjacent 16-bit values expose rotations AND quantization.
+        raw = (np.arange(35).reshape(5, 7) + 1200).astype(dtype)
+        path = tmp_path / f'o-{orientation}-{np.dtype(dtype).name}.tiff'
+        Image.fromarray(raw).save(path, tiffinfo={274: orientation}, compression='raw')
+        loaded = load_comparison_asset(ComparisonAsset(id='tiff', path=path))
+        expected = np.repeat(oriented(raw, orientation)[..., None], 3, axis=2)
+>       np.testing.assert_array_equal(loaded.pixels, expected / np.iinfo(dtype).max)
+E       AssertionError: 
+E       Arrays are not equal
+E       
+E       Mismatched elements: 84 / 105 (80%)
+E       Max absolute difference among violations: 0.00042725
+E       Max relative difference among violations: 0.02333333
+E        ACTUAL: array([[[0.018311, 0.018311, 0.018311],
+E               [0.018326, 0.018326, 0.018326],
+E               [0.018341, 0.018341, 0.018341],...
+E        DESIRED: array([[[0.018738, 0.018738, 0.018738],
+E               [0.018753, 0.018753, 0.018753],
+E               [0.018769, 0.018769, 0.018769],...
+
+packages/iqa/tests/test_asset_io_remediation_r1.py:40: AssertionError
+_______ test_tiff_orientation_once_preserves_source_precision[uint16-5] ________
+
+tmp_path = PosixPath('/tmp/pytest-of-root/pytest-210/test_tiff_orientation_once_pre12')
+orientation = 5, dtype = <class 'numpy.uint16'>
+
+    @pytest.mark.parametrize('orientation', range(1, 9))
+    @pytest.mark.parametrize('dtype', [np.uint8, np.uint16])
+    def test_tiff_orientation_once_preserves_source_precision(tmp_path, orientation, dtype):
+        # Distinct positions/adjacent 16-bit values expose rotations AND quantization.
+        raw = (np.arange(35).reshape(5, 7) + 1200).astype(dtype)
+        path = tmp_path / f'o-{orientation}-{np.dtype(dtype).name}.tiff'
+        Image.fromarray(raw).save(path, tiffinfo={274: orientation}, compression='raw')
+        loaded = load_comparison_asset(ComparisonAsset(id='tiff', path=path))
+        expected = np.repeat(oriented(raw, orientation)[..., None], 3, axis=2)
+>       np.testing.assert_array_equal(loaded.pixels, expected / np.iinfo(dtype).max)
+E       AssertionError: 
+E       Arrays are not equal
+E       
+E       (shapes (5, 7, 3), (7, 5, 3) mismatch)
+E        ACTUAL: array([[[0.018311, 0.018311, 0.018311],
+E               [0.018326, 0.018326, 0.018326],
+E               [0.018341, 0.018341, 0.018341],...
+E        DESIRED: array([[[0.018311, 0.018311, 0.018311],
+E               [0.018418, 0.018418, 0.018418],
+E               [0.018524, 0.018524, 0.018524],...
+
+packages/iqa/tests/test_asset_io_remediation_r1.py:40: AssertionError
+_______ test_tiff_orientation_once_preserves_source_precision[uint16-6] ________
+
+tmp_path = PosixPath('/tmp/pytest-of-root/pytest-210/test_tiff_orientation_once_pre13')
+orientation = 6, dtype = <class 'numpy.uint16'>
+
+    @pytest.mark.parametrize('orientation', range(1, 9))
+    @pytest.mark.parametrize('dtype', [np.uint8, np.uint16])
+    def test_tiff_orientation_once_preserves_source_precision(tmp_path, orientation, dtype):
+        # Distinct positions/adjacent 16-bit values expose rotations AND quantization.
+        raw = (np.arange(35).reshape(5, 7) + 1200).astype(dtype)
+        path = tmp_path / f'o-{orientation}-{np.dtype(dtype).name}.tiff'
+        Image.fromarray(raw).save(path, tiffinfo={274: orientation}, compression='raw')
+        loaded = load_comparison_asset(ComparisonAsset(id='tiff', path=path))
+        expected = np.repeat(oriented(raw, orientation)[..., None], 3, axis=2)
+>       np.testing.assert_array_equal(loaded.pixels, expected / np.iinfo(dtype).max)
+E       AssertionError: 
+E       Arrays are not equal
+E       
+E       (shapes (5, 7, 3), (7, 5, 3) mismatch)
+E        ACTUAL: array([[[0.01883 , 0.01883 , 0.01883 ],
+E               [0.018814, 0.018814, 0.018814],
+E               [0.018799, 0.018799, 0.018799],...
+E        DESIRED: array([[[0.018738, 0.018738, 0.018738],
+E               [0.018631, 0.018631, 0.018631],
+E               [0.018524, 0.018524, 0.018524],...
+
+packages/iqa/tests/test_asset_io_remediation_r1.py:40: AssertionError
+_______ test_tiff_orientation_once_preserves_source_precision[uint16-7] ________
+
+tmp_path = PosixPath('/tmp/pytest-of-root/pytest-210/test_tiff_orientation_once_pre14')
+orientation = 7, dtype = <class 'numpy.uint16'>
+
+    @pytest.mark.parametrize('orientation', range(1, 9))
+    @pytest.mark.parametrize('dtype', [np.uint8, np.uint16])
+    def test_tiff_orientation_once_preserves_source_precision(tmp_path, orientation, dtype):
+        # Distinct positions/adjacent 16-bit values expose rotations AND quantization.
+        raw = (np.arange(35).reshape(5, 7) + 1200).astype(dtype)
+        path = tmp_path / f'o-{orientation}-{np.dtype(dtype).name}.tiff'
+        Image.fromarray(raw).save(path, tiffinfo={274: orientation}, compression='raw')
+        loaded = load_comparison_asset(ComparisonAsset(id='tiff', path=path))
+        expected = np.repeat(oriented(raw, orientation)[..., None], 3, axis=2)
+>       np.testing.assert_array_equal(loaded.pixels, expected / np.iinfo(dtype).max)
+E       AssertionError: 
+E       Arrays are not equal
+E       
+E       (shapes (5, 7, 3), (7, 5, 3) mismatch)
+E        ACTUAL: array([[[0.018311, 0.018311, 0.018311],
+E               [0.018326, 0.018326, 0.018326],
+E               [0.018341, 0.018341, 0.018341],...
+E        DESIRED: array([[[0.01883 , 0.01883 , 0.01883 ],
+E               [0.018723, 0.018723, 0.018723],
+E               [0.018616, 0.018616, 0.018616],...
+
+packages/iqa/tests/test_asset_io_remediation_r1.py:40: AssertionError
+_______ test_tiff_orientation_once_preserves_source_precision[uint16-8] ________
+
+tmp_path = PosixPath('/tmp/pytest-of-root/pytest-210/test_tiff_orientation_once_pre15')
+orientation = 8, dtype = <class 'numpy.uint16'>
+
+    @pytest.mark.parametrize('orientation', range(1, 9))
+    @pytest.mark.parametrize('dtype', [np.uint8, np.uint16])
+    def test_tiff_orientation_once_preserves_source_precision(tmp_path, orientation, dtype):
+        # Distinct positions/adjacent 16-bit values expose rotations AND quantization.
+        raw = (np.arange(35).reshape(5, 7) + 1200).astype(dtype)
+        path = tmp_path / f'o-{orientation}-{np.dtype(dtype).name}.tiff'
+        Image.fromarray(raw).save(path, tiffinfo={274: orientation}, compression='raw')
+        loaded = load_comparison_asset(ComparisonAsset(id='tiff', path=path))
+        expected = np.repeat(oriented(raw, orientation)[..., None], 3, axis=2)
+>       np.testing.assert_array_equal(loaded.pixels, expected / np.iinfo(dtype).max)
+E       AssertionError: 
+E       Arrays are not equal
+E       
+E       (shapes (5, 7, 3), (7, 5, 3) mismatch)
+E        ACTUAL: array([[[0.01883 , 0.01883 , 0.01883 ],
+E               [0.018814, 0.018814, 0.018814],
+E               [0.018799, 0.018799, 0.018799],...
+E        DESIRED: array([[[0.018402, 0.018402, 0.018402],
+E               [0.018509, 0.018509, 0.018509],
+E               [0.018616, 0.018616, 0.018616],...
+
+packages/iqa/tests/test_asset_io_remediation_r1.py:40: AssertionError
+_ test_implicit_and_explicit_effective_roi_collision_rejected[B-False-algorithm] _
+
+tmp_path = PosixPath('/tmp/pytest-of-root/pytest-210/test_implicit_and_explicit_eff0')
+mode = 'algorithm', reverse = False, explicit_asset = 'B'
+
+    @pytest.mark.parametrize('mode', ['algorithm', 'device'])
+    @pytest.mark.parametrize('reverse', [False, True])
+    @pytest.mark.parametrize('explicit_asset', ['B', 'C'])
+    def test_implicit_and_explicit_effective_roi_collision_rejected(tmp_path, mode, reverse, explicit_asset):
+        image = tmp_path / 'image.png'
+        Image.fromarray(np.zeros((32, 32, 3), np.uint8)).save(image)
+        rois = [
+            {'id': 'face', 'kind': 'face', 'person_id': 'person', 'bbox': [0, 0, 8, 8]},
+            {'id': 'face', 'kind': 'face', 'person_id': 'person', 'bbox': [20, 20, 8, 8], 'asset_id': explicit_asset},
+        ]
+        if reverse:
+            rois.reverse()
+>       with pytest.raises(ValidationError):
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       Failed: DID NOT RAISE ValidationError
+
+packages/iqa/tests/test_asset_io_remediation_r1.py:59: Failed
+_ test_implicit_and_explicit_effective_roi_collision_rejected[B-False-device] __
+
+tmp_path = PosixPath('/tmp/pytest-of-root/pytest-210/test_implicit_and_explicit_eff1')
+mode = 'device', reverse = False, explicit_asset = 'B'
+
+    @pytest.mark.parametrize('mode', ['algorithm', 'device'])
+    @pytest.mark.parametrize('reverse', [False, True])
+    @pytest.mark.parametrize('explicit_asset', ['B', 'C'])
+    def test_implicit_and_explicit_effective_roi_collision_rejected(tmp_path, mode, reverse, explicit_asset):
+        image = tmp_path / 'image.png'
+        Image.fromarray(np.zeros((32, 32, 3), np.uint8)).save(image)
+        rois = [
+            {'id': 'face', 'kind': 'face', 'person_id': 'person', 'bbox': [0, 0, 8, 8]},
+            {'id': 'face', 'kind': 'face', 'person_id': 'person', 'bbox': [20, 20, 8, 8], 'asset_id': explicit_asset},
+        ]
+        if reverse:
+            rois.reverse()
+>       with pytest.raises(ValidationError):
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       Failed: DID NOT RAISE ValidationError
+
+packages/iqa/tests/test_asset_io_remediation_r1.py:59: Failed
+_ test_implicit_and_explicit_effective_roi_collision_rejected[B-True-algorithm] _
+
+tmp_path = PosixPath('/tmp/pytest-of-root/pytest-210/test_implicit_and_explicit_eff2')
+mode = 'algorithm', reverse = True, explicit_asset = 'B'
+
+    @pytest.mark.parametrize('mode', ['algorithm', 'device'])
+    @pytest.mark.parametrize('reverse', [False, True])
+    @pytest.mark.parametrize('explicit_asset', ['B', 'C'])
+    def test_implicit_and_explicit_effective_roi_collision_rejected(tmp_path, mode, reverse, explicit_asset):
+        image = tmp_path / 'image.png'
+        Image.fromarray(np.zeros((32, 32, 3), np.uint8)).save(image)
+        rois = [
+            {'id': 'face', 'kind': 'face', 'person_id': 'person', 'bbox': [0, 0, 8, 8]},
+            {'id': 'face', 'kind': 'face', 'person_id': 'person', 'bbox': [20, 20, 8, 8], 'asset_id': explicit_asset},
+        ]
+        if reverse:
+            rois.reverse()
+>       with pytest.raises(ValidationError):
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       Failed: DID NOT RAISE ValidationError
+
+packages/iqa/tests/test_asset_io_remediation_r1.py:59: Failed
+__ test_implicit_and_explicit_effective_roi_collision_rejected[B-True-device] __
+
+tmp_path = PosixPath('/tmp/pytest-of-root/pytest-210/test_implicit_and_explicit_eff3')
+mode = 'device', reverse = True, explicit_asset = 'B'
+
+    @pytest.mark.parametrize('mode', ['algorithm', 'device'])
+    @pytest.mark.parametrize('reverse', [False, True])
+    @pytest.mark.parametrize('explicit_asset', ['B', 'C'])
+    def test_implicit_and_explicit_effective_roi_collision_rejected(tmp_path, mode, reverse, explicit_asset):
+        image = tmp_path / 'image.png'
+        Image.fromarray(np.zeros((32, 32, 3), np.uint8)).save(image)
+        rois = [
+            {'id': 'face', 'kind': 'face', 'person_id': 'person', 'bbox': [0, 0, 8, 8]},
+            {'id': 'face', 'kind': 'face', 'person_id': 'person', 'bbox': [20, 20, 8, 8], 'asset_id': explicit_asset},
+        ]
+        if reverse:
+            rois.reverse()
+>       with pytest.raises(ValidationError):
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       Failed: DID NOT RAISE ValidationError
+
+packages/iqa/tests/test_asset_io_remediation_r1.py:59: Failed
+_ test_implicit_and_explicit_effective_roi_collision_rejected[C-False-device] __
+
+tmp_path = PosixPath('/tmp/pytest-of-root/pytest-210/test_implicit_and_explicit_eff5')
+mode = 'device', reverse = False, explicit_asset = 'C'
+
+    @pytest.mark.parametrize('mode', ['algorithm', 'device'])
+    @pytest.mark.parametrize('reverse', [False, True])
+    @pytest.mark.parametrize('explicit_asset', ['B', 'C'])
+    def test_implicit_and_explicit_effective_roi_collision_rejected(tmp_path, mode, reverse, explicit_asset):
+        image = tmp_path / 'image.png'
+        Image.fromarray(np.zeros((32, 32, 3), np.uint8)).save(image)
+        rois = [
+            {'id': 'face', 'kind': 'face', 'person_id': 'person', 'bbox': [0, 0, 8, 8]},
+            {'id': 'face', 'kind': 'face', 'person_id': 'person', 'bbox': [20, 20, 8, 8], 'asset_id': explicit_asset},
+        ]
+        if reverse:
+            rois.reverse()
+>       with pytest.raises(ValidationError):
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       Failed: DID NOT RAISE ValidationError
+
+packages/iqa/tests/test_asset_io_remediation_r1.py:59: Failed
+__ test_implicit_and_explicit_effective_roi_collision_rejected[C-True-device] __
+
+tmp_path = PosixPath('/tmp/pytest-of-root/pytest-210/test_implicit_and_explicit_eff7')
+mode = 'device', reverse = True, explicit_asset = 'C'
+
+    @pytest.mark.parametrize('mode', ['algorithm', 'device'])
+    @pytest.mark.parametrize('reverse', [False, True])
+    @pytest.mark.parametrize('explicit_asset', ['B', 'C'])
+    def test_implicit_and_explicit_effective_roi_collision_rejected(tmp_path, mode, reverse, explicit_asset):
+        image = tmp_path / 'image.png'
+        Image.fromarray(np.zeros((32, 32, 3), np.uint8)).save(image)
+        rois = [
+            {'id': 'face', 'kind': 'face', 'person_id': 'person', 'bbox': [0, 0, 8, 8]},
+            {'id': 'face', 'kind': 'face', 'person_id': 'person', 'bbox': [20, 20, 8, 8], 'asset_id': explicit_asset},
+        ]
+        if reverse:
+            rois.reverse()
+>       with pytest.raises(ValidationError):
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       Failed: DID NOT RAISE ValidationError
+
+packages/iqa/tests/test_asset_io_remediation_r1.py:59: Failed
+__________ test_invalid_npy_loader_error_keeps_exact_byte_sha[empty] ___________
+
+tmp_path = PosixPath('/tmp/pytest-of-root/pytest-210/test_invalid_npy_loader_error_0')
+kind = 'empty'
+
+    @pytest.mark.parametrize('kind', ['empty', 'truncated'])
+    def test_invalid_npy_loader_error_keeps_exact_byte_sha(tmp_path, kind):
+        path, contents = invalid_npy(tmp_path, kind)
+        with pytest.raises(AssetDecodeError) as exc:
+>           load_comparison_asset(ComparisonAsset(id='bad', path=path, encoding='linear'))
+
+packages/iqa/tests/test_asset_io_remediation_r1.py:78: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+packages/iqa/src/qwen_tmqa/asset_io.py:59: in load_comparison_asset
+    return _decode(asset, data, trace)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+packages/iqa/src/qwen_tmqa/asset_io.py:68: in _decode
+    raw = np.load(io.BytesIO(data), allow_pickle=False)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+file = <_io.BytesIO object at 0x7fcc553d0db0>, mmap_mode = None
+allow_pickle = False, fix_imports = True, encoding = 'ASCII'
+max_header_size = 10000
+
+    @set_module('numpy')
+    def load(file, mmap_mode=None, allow_pickle=False, fix_imports=True,
+             encoding='ASCII', *, max_header_size=_MAX_HEADER_SIZE):
+        """
+        Load arrays or pickled objects from ``.npy``, ``.npz`` or pickled files.
+    
+        .. warning:: Loading files that contain object arrays uses the ``pickle``
+                     module, which is not secure against erroneous or maliciously
+                     constructed data. Consider passing ``allow_pickle=False`` to
+                     load data that is known not to contain object arrays for the
+                     safer handling of untrusted sources.
+    
+        Parameters
+        ----------
+        file : file-like object, string, or pathlib.Path
+            The file to read. File-like objects must support the
+            ``seek()`` and ``read()`` methods and must always
+            be opened in binary mode.  Pickled files require that the
+            file-like object support the ``readline()`` method as well.
+        mmap_mode : {None, 'r+', 'r', 'w+', 'c'}, optional
+            If not None, then memory-map the file, using the given mode (see
+            `numpy.memmap` for a detailed description of the modes).  A
+            memory-mapped array is kept on disk. However, it can be accessed
+            and sliced like any ndarray.  Memory mapping is especially useful
+            for accessing small fragments of large files without reading the
+            entire file into memory.
+        allow_pickle : bool, optional
+            Allow loading pickled object arrays stored in npy files. Reasons for
+            disallowing pickles include security, as loading pickled data can
+            execute arbitrary code. If pickles are disallowed, loading object
+            arrays will fail. Default: False
+        fix_imports : bool, optional
+            Only useful when loading Python 2 generated pickled files,
+            which includes npy/npz files containing object arrays. If `fix_imports`
+            is True, pickle will try to map the old Python 2 names to the new names
+            used in Python 3.
+        encoding : str, optional
+            What encoding to use when reading Python 2 strings. Only useful when
+            loading Python 2 generated pickled files, which includes
+            npy/npz files containing object arrays. Values other than 'latin1',
+            'ASCII', and 'bytes' are not allowed, as they can corrupt numerical
+            data. Default: 'ASCII'
+        max_header_size : int, optional
+            Maximum allowed size of the header.  Large headers may not be safe
+            to load securely and thus require explicitly passing a larger value.
+            See :py:func:`ast.literal_eval()` for details.
+            This option is ignored when `allow_pickle` is passed.  In that case
+            the file is by definition trusted and the limit is unnecessary.
+    
+        Returns
+        -------
+        result : array, tuple, dict, etc.
+            Data stored in the file. For ``.npz`` files, the returned instance
+            of NpzFile class must be closed to avoid leaking file descriptors.
+    
+        Raises
+        ------
+        OSError
+            If the input file does not exist or cannot be read.
+        UnpicklingError
+            If ``allow_pickle=True``, but the file cannot be loaded as a pickle.
+        ValueError
+            The file contains an object array, but ``allow_pickle=False`` given.
+        EOFError
+            When calling ``np.load`` multiple times on the same file handle,
+            if all data has already been read
+    
+        See Also
+        --------
+        save, savez, savez_compressed, loadtxt
+        memmap : Create a memory-map to an array stored in a file on disk.
+        lib.format.open_memmap : Create or load a memory-mapped ``.npy`` file.
+    
+        Notes
+        -----
+        - If the file contains pickle data, then whatever object is stored
+          in the pickle is returned.
+        - If the file is a ``.npy`` file, then a single array is returned.
+        - If the file is a ``.npz`` file, then a dictionary-like object is
+          returned, containing ``{filename: array}`` key-value pairs, one for
+          each file in the archive.
+        - If the file is a ``.npz`` file, the returned value supports the
+          context manager protocol in a similar fashion to the open function::
+    
+            with load('foo.npz') as data:
+                a = data['a']
+    
+          The underlying file descriptor is closed when exiting the 'with'
+          block.
+    
+        Examples
+        --------
+        >>> import numpy as np
+    
+        Store data to disk, and load it again:
+    
+        >>> np.save('/tmp/123', np.array([[1, 2, 3], [4, 5, 6]]))
+        >>> np.load('/tmp/123.npy')
+        array([[1, 2, 3],
+               [4, 5, 6]])
+    
+        Store compressed data to disk, and load it again:
+    
+        >>> a=np.array([[1, 2, 3], [4, 5, 6]])
+        >>> b=np.array([1, 2])
+        >>> np.savez('/tmp/123.npz', a=a, b=b)
+        >>> data = np.load('/tmp/123.npz')
+        >>> data['a']
+        array([[1, 2, 3],
+               [4, 5, 6]])
+        >>> data['b']
+        array([1, 2])
+        >>> data.close()
+    
+        Mem-map the stored array, and then access the second row
+        directly from disk:
+    
+        >>> X = np.load('/tmp/123.npy', mmap_mode='r')
+        >>> X[1, :]
+        memmap([4, 5, 6])
+    
+        """
+        if encoding not in ('ASCII', 'latin1', 'bytes'):
+            # The 'encoding' value for pickle also affects what encoding
+            # the serialized binary data of NumPy arrays is loaded
+            # in. Pickle does not pass on the encoding information to
+            # NumPy. The unpickling code in numpy._core.multiarray is
+            # written to assume that unicode data appearing where binary
+            # should be is in 'latin1'. 'bytes' is also safe, as is 'ASCII'.
+            #
+            # Other encoding values can corrupt binary data, and we
+            # purposefully disallow them. For the same reason, the errors=
+            # argument is not exposed, as values other than 'strict'
+            # result can similarly silently corrupt numerical data.
+            raise ValueError("encoding must be 'ASCII', 'latin1', or 'bytes'")
+    
+        pickle_kwargs = {'encoding': encoding, 'fix_imports': fix_imports}
+    
+        with contextlib.ExitStack() as stack:
+            if hasattr(file, 'read'):
+                fid = file
+                own_fid = False
+            else:
+                fid = stack.enter_context(open(os.fspath(file), "rb"))
+                own_fid = True
+    
+            # Code to distinguish from NumPy binary files and pickles.
+            _ZIP_PREFIX = b'PK\x03\x04'
+            _ZIP_SUFFIX = b'PK\x05\x06'  # empty zip files start with this
+            N = len(format.MAGIC_PREFIX)
+            magic = fid.read(N)
+            if not magic:
+>               raise EOFError("No data left in file")
+E               EOFError: No data left in file
+
+/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/site-packages/numpy/lib/_npyio_impl.py:463: EOFError
+______ test_invalid_npy_evaluator_returns_finite_invalid_evidence[empty] _______
+
+tmp_path = PosixPath('/tmp/pytest-of-root/pytest-210/test_invalid_npy_evaluator_ret0')
+kind = 'empty'
+
+    @pytest.mark.parametrize('kind', ['empty', 'truncated'])
+    def test_invalid_npy_evaluator_returns_finite_invalid_evidence(tmp_path, kind):
+        path, contents = invalid_npy(tmp_path, kind)
+>       result = evaluate_comparison(ComparisonRequest(scene_id='s', group_id='g', mode='algorithm',
+            baseline={'id': 'B', 'path': path}, candidates=[{'id': 'C', 'path': path}]))
+
+packages/iqa/tests/test_asset_io_remediation_r1.py:86: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+packages/iqa/src/qwen_tmqa/comparison.py:285: in evaluate_comparison
+    loaded[asset.id] = load_comparison_asset(asset)
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+packages/iqa/src/qwen_tmqa/asset_io.py:59: in load_comparison_asset
+    return _decode(asset, data, trace)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+packages/iqa/src/qwen_tmqa/asset_io.py:68: in _decode
+    raw = np.load(io.BytesIO(data), allow_pickle=False)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+file = <_io.BytesIO object at 0x7fcc5529a020>, mmap_mode = None
+allow_pickle = False, fix_imports = True, encoding = 'ASCII'
+max_header_size = 10000
+
+    @set_module('numpy')
+    def load(file, mmap_mode=None, allow_pickle=False, fix_imports=True,
+             encoding='ASCII', *, max_header_size=_MAX_HEADER_SIZE):
+        """
+        Load arrays or pickled objects from ``.npy``, ``.npz`` or pickled files.
+    
+        .. warning:: Loading files that contain object arrays uses the ``pickle``
+                     module, which is not secure against erroneous or maliciously
+                     constructed data. Consider passing ``allow_pickle=False`` to
+                     load data that is known not to contain object arrays for the
+                     safer handling of untrusted sources.
+    
+        Parameters
+        ----------
+        file : file-like object, string, or pathlib.Path
+            The file to read. File-like objects must support the
+            ``seek()`` and ``read()`` methods and must always
+            be opened in binary mode.  Pickled files require that the
+            file-like object support the ``readline()`` method as well.
+        mmap_mode : {None, 'r+', 'r', 'w+', 'c'}, optional
+            If not None, then memory-map the file, using the given mode (see
+            `numpy.memmap` for a detailed description of the modes).  A
+            memory-mapped array is kept on disk. However, it can be accessed
+            and sliced like any ndarray.  Memory mapping is especially useful
+            for accessing small fragments of large files without reading the
+            entire file into memory.
+        allow_pickle : bool, optional
+            Allow loading pickled object arrays stored in npy files. Reasons for
+            disallowing pickles include security, as loading pickled data can
+            execute arbitrary code. If pickles are disallowed, loading object
+            arrays will fail. Default: False
+        fix_imports : bool, optional
+            Only useful when loading Python 2 generated pickled files,
+            which includes npy/npz files containing object arrays. If `fix_imports`
+            is True, pickle will try to map the old Python 2 names to the new names
+            used in Python 3.
+        encoding : str, optional
+            What encoding to use when reading Python 2 strings. Only useful when
+            loading Python 2 generated pickled files, which includes
+            npy/npz files containing object arrays. Values other than 'latin1',
+            'ASCII', and 'bytes' are not allowed, as they can corrupt numerical
+            data. Default: 'ASCII'
+        max_header_size : int, optional
+            Maximum allowed size of the header.  Large headers may not be safe
+            to load securely and thus require explicitly passing a larger value.
+            See :py:func:`ast.literal_eval()` for details.
+            This option is ignored when `allow_pickle` is passed.  In that case
+            the file is by definition trusted and the limit is unnecessary.
+    
+        Returns
+        -------
+        result : array, tuple, dict, etc.
+            Data stored in the file. For ``.npz`` files, the returned instance
+            of NpzFile class must be closed to avoid leaking file descriptors.
+    
+        Raises
+        ------
+        OSError
+            If the input file does not exist or cannot be read.
+        UnpicklingError
+            If ``allow_pickle=True``, but the file cannot be loaded as a pickle.
+        ValueError
+            The file contains an object array, but ``allow_pickle=False`` given.
+        EOFError
+            When calling ``np.load`` multiple times on the same file handle,
+            if all data has already been read
+    
+        See Also
+        --------
+        save, savez, savez_compressed, loadtxt
+        memmap : Create a memory-map to an array stored in a file on disk.
+        lib.format.open_memmap : Create or load a memory-mapped ``.npy`` file.
+    
+        Notes
+        -----
+        - If the file contains pickle data, then whatever object is stored
+          in the pickle is returned.
+        - If the file is a ``.npy`` file, then a single array is returned.
+        - If the file is a ``.npz`` file, then a dictionary-like object is
+          returned, containing ``{filename: array}`` key-value pairs, one for
+          each file in the archive.
+        - If the file is a ``.npz`` file, the returned value supports the
+          context manager protocol in a similar fashion to the open function::
+    
+            with load('foo.npz') as data:
+                a = data['a']
+    
+          The underlying file descriptor is closed when exiting the 'with'
+          block.
+    
+        Examples
+        --------
+        >>> import numpy as np
+    
+        Store data to disk, and load it again:
+    
+        >>> np.save('/tmp/123', np.array([[1, 2, 3], [4, 5, 6]]))
+        >>> np.load('/tmp/123.npy')
+        array([[1, 2, 3],
+               [4, 5, 6]])
+    
+        Store compressed data to disk, and load it again:
+    
+        >>> a=np.array([[1, 2, 3], [4, 5, 6]])
+        >>> b=np.array([1, 2])
+        >>> np.savez('/tmp/123.npz', a=a, b=b)
+        >>> data = np.load('/tmp/123.npz')
+        >>> data['a']
+        array([[1, 2, 3],
+               [4, 5, 6]])
+        >>> data['b']
+        array([1, 2])
+        >>> data.close()
+    
+        Mem-map the stored array, and then access the second row
+        directly from disk:
+    
+        >>> X = np.load('/tmp/123.npy', mmap_mode='r')
+        >>> X[1, :]
+        memmap([4, 5, 6])
+    
+        """
+        if encoding not in ('ASCII', 'latin1', 'bytes'):
+            # The 'encoding' value for pickle also affects what encoding
+            # the serialized binary data of NumPy arrays is loaded
+            # in. Pickle does not pass on the encoding information to
+            # NumPy. The unpickling code in numpy._core.multiarray is
+            # written to assume that unicode data appearing where binary
+            # should be is in 'latin1'. 'bytes' is also safe, as is 'ASCII'.
+            #
+            # Other encoding values can corrupt binary data, and we
+            # purposefully disallow them. For the same reason, the errors=
+            # argument is not exposed, as values other than 'strict'
+            # result can similarly silently corrupt numerical data.
+            raise ValueError("encoding must be 'ASCII', 'latin1', or 'bytes'")
+    
+        pickle_kwargs = {'encoding': encoding, 'fix_imports': fix_imports}
+    
+        with contextlib.ExitStack() as stack:
+            if hasattr(file, 'read'):
+                fid = file
+                own_fid = False
+            else:
+                fid = stack.enter_context(open(os.fspath(file), "rb"))
+                own_fid = True
+    
+            # Code to distinguish from NumPy binary files and pickles.
+            _ZIP_PREFIX = b'PK\x03\x04'
+            _ZIP_SUFFIX = b'PK\x05\x06'  # empty zip files start with this
+            N = len(format.MAGIC_PREFIX)
+            magic = fid.read(N)
+            if not magic:
+>               raise EOFError("No data left in file")
+E               EOFError: No data left in file
+
+/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/site-packages/numpy/lib/_npyio_impl.py:463: EOFError
+___ test_invalid_npy_cli_writes_finite_rejection_instead_of_crashing[empty] ____
+
+tmp_path = PosixPath('/tmp/pytest-of-root/pytest-210/test_invalid_npy_cli_writes_fi0')
+kind = 'empty'
+
+    @pytest.mark.parametrize('kind', ['empty', 'truncated'])
+    def test_invalid_npy_cli_writes_finite_rejection_instead_of_crashing(tmp_path, kind):
+        path, contents = invalid_npy(tmp_path, kind)
+        manifest = tmp_path / 'manifest.json'
+        manifest.write_text(json.dumps({'scene_id': 's', 'group_id': 'g', 'mode': 'algorithm',
+            'baseline': {'id': 'B', 'path': str(path)}, 'candidates': [{'id': 'C', 'path': str(path)}]}))
+        output = tmp_path / 'output.json'
+>       assert main(['evaluate', '--manifest', str(manifest), '--output', str(output)]) == 0
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+packages/iqa/tests/test_asset_io_remediation_r1.py:101: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+packages/iqa/src/qwen_tmqa/comparison_cli.py:220: in main
+    result = evaluate_comparison(_manifest_request(args.manifest))
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+packages/iqa/src/qwen_tmqa/comparison.py:285: in evaluate_comparison
+    loaded[asset.id] = load_comparison_asset(asset)
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+packages/iqa/src/qwen_tmqa/asset_io.py:59: in load_comparison_asset
+    return _decode(asset, data, trace)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+packages/iqa/src/qwen_tmqa/asset_io.py:68: in _decode
+    raw = np.load(io.BytesIO(data), allow_pickle=False)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+file = <_io.BytesIO object at 0x7fcc5529be70>, mmap_mode = None
+allow_pickle = False, fix_imports = True, encoding = 'ASCII'
+max_header_size = 10000
+
+    @set_module('numpy')
+    def load(file, mmap_mode=None, allow_pickle=False, fix_imports=True,
+             encoding='ASCII', *, max_header_size=_MAX_HEADER_SIZE):
+        """
+        Load arrays or pickled objects from ``.npy``, ``.npz`` or pickled files.
+    
+        .. warning:: Loading files that contain object arrays uses the ``pickle``
+                     module, which is not secure against erroneous or maliciously
+                     constructed data. Consider passing ``allow_pickle=False`` to
+                     load data that is known not to contain object arrays for the
+                     safer handling of untrusted sources.
+    
+        Parameters
+        ----------
+        file : file-like object, string, or pathlib.Path
+            The file to read. File-like objects must support the
+            ``seek()`` and ``read()`` methods and must always
+            be opened in binary mode.  Pickled files require that the
+            file-like object support the ``readline()`` method as well.
+        mmap_mode : {None, 'r+', 'r', 'w+', 'c'}, optional
+            If not None, then memory-map the file, using the given mode (see
+            `numpy.memmap` for a detailed description of the modes).  A
+            memory-mapped array is kept on disk. However, it can be accessed
+            and sliced like any ndarray.  Memory mapping is especially useful
+            for accessing small fragments of large files without reading the
+            entire file into memory.
+        allow_pickle : bool, optional
+            Allow loading pickled object arrays stored in npy files. Reasons for
+            disallowing pickles include security, as loading pickled data can
+            execute arbitrary code. If pickles are disallowed, loading object
+            arrays will fail. Default: False
+        fix_imports : bool, optional
+            Only useful when loading Python 2 generated pickled files,
+            which includes npy/npz files containing object arrays. If `fix_imports`
+            is True, pickle will try to map the old Python 2 names to the new names
+            used in Python 3.
+        encoding : str, optional
+            What encoding to use when reading Python 2 strings. Only useful when
+            loading Python 2 generated pickled files, which includes
+            npy/npz files containing object arrays. Values other than 'latin1',
+            'ASCII', and 'bytes' are not allowed, as they can corrupt numerical
+            data. Default: 'ASCII'
+        max_header_size : int, optional
+            Maximum allowed size of the header.  Large headers may not be safe
+            to load securely and thus require explicitly passing a larger value.
+            See :py:func:`ast.literal_eval()` for details.
+            This option is ignored when `allow_pickle` is passed.  In that case
+            the file is by definition trusted and the limit is unnecessary.
+    
+        Returns
+        -------
+        result : array, tuple, dict, etc.
+            Data stored in the file. For ``.npz`` files, the returned instance
+            of NpzFile class must be closed to avoid leaking file descriptors.
+    
+        Raises
+        ------
+        OSError
+            If the input file does not exist or cannot be read.
+        UnpicklingError
+            If ``allow_pickle=True``, but the file cannot be loaded as a pickle.
+        ValueError
+            The file contains an object array, but ``allow_pickle=False`` given.
+        EOFError
+            When calling ``np.load`` multiple times on the same file handle,
+            if all data has already been read
+    
+        See Also
+        --------
+        save, savez, savez_compressed, loadtxt
+        memmap : Create a memory-map to an array stored in a file on disk.
+        lib.format.open_memmap : Create or load a memory-mapped ``.npy`` file.
+    
+        Notes
+        -----
+        - If the file contains pickle data, then whatever object is stored
+          in the pickle is returned.
+        - If the file is a ``.npy`` file, then a single array is returned.
+        - If the file is a ``.npz`` file, then a dictionary-like object is
+          returned, containing ``{filename: array}`` key-value pairs, one for
+          each file in the archive.
+        - If the file is a ``.npz`` file, the returned value supports the
+          context manager protocol in a similar fashion to the open function::
+    
+            with load('foo.npz') as data:
+                a = data['a']
+    
+          The underlying file descriptor is closed when exiting the 'with'
+          block.
+    
+        Examples
+        --------
+        >>> import numpy as np
+    
+        Store data to disk, and load it again:
+    
+        >>> np.save('/tmp/123', np.array([[1, 2, 3], [4, 5, 6]]))
+        >>> np.load('/tmp/123.npy')
+        array([[1, 2, 3],
+               [4, 5, 6]])
+    
+        Store compressed data to disk, and load it again:
+    
+        >>> a=np.array([[1, 2, 3], [4, 5, 6]])
+        >>> b=np.array([1, 2])
+        >>> np.savez('/tmp/123.npz', a=a, b=b)
+        >>> data = np.load('/tmp/123.npz')
+        >>> data['a']
+        array([[1, 2, 3],
+               [4, 5, 6]])
+        >>> data['b']
+        array([1, 2])
+        >>> data.close()
+    
+        Mem-map the stored array, and then access the second row
+        directly from disk:
+    
+        >>> X = np.load('/tmp/123.npy', mmap_mode='r')
+        >>> X[1, :]
+        memmap([4, 5, 6])
+    
+        """
+        if encoding not in ('ASCII', 'latin1', 'bytes'):
+            # The 'encoding' value for pickle also affects what encoding
+            # the serialized binary data of NumPy arrays is loaded
+            # in. Pickle does not pass on the encoding information to
+            # NumPy. The unpickling code in numpy._core.multiarray is
+            # written to assume that unicode data appearing where binary
+            # should be is in 'latin1'. 'bytes' is also safe, as is 'ASCII'.
+            #
+            # Other encoding values can corrupt binary data, and we
+            # purposefully disallow them. For the same reason, the errors=
+            # argument is not exposed, as values other than 'strict'
+            # result can similarly silently corrupt numerical data.
+            raise ValueError("encoding must be 'ASCII', 'latin1', or 'bytes'")
+    
+        pickle_kwargs = {'encoding': encoding, 'fix_imports': fix_imports}
+    
+        with contextlib.ExitStack() as stack:
+            if hasattr(file, 'read'):
+                fid = file
+                own_fid = False
+            else:
+                fid = stack.enter_context(open(os.fspath(file), "rb"))
+                own_fid = True
+    
+            # Code to distinguish from NumPy binary files and pickles.
+            _ZIP_PREFIX = b'PK\x03\x04'
+            _ZIP_SUFFIX = b'PK\x05\x06'  # empty zip files start with this
+            N = len(format.MAGIC_PREFIX)
+            magic = fid.read(N)
+            if not magic:
+>               raise EOFError("No data left in file")
+E               EOFError: No data left in file
+
+/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/site-packages/numpy/lib/_npyio_impl.py:463: EOFError
+=========================== short test summary info ============================
+FAILED packages/iqa/tests/test_asset_io_remediation_r1.py::test_tiff_orientation_once_preserves_source_precision[uint8-2]
+FAILED packages/iqa/tests/test_asset_io_remediation_r1.py::test_tiff_orientation_once_preserves_source_precision[uint8-3]
+FAILED packages/iqa/tests/test_asset_io_remediation_r1.py::test_tiff_orientation_once_preserves_source_precision[uint8-4]
+FAILED packages/iqa/tests/test_asset_io_remediation_r1.py::test_tiff_orientation_once_preserves_source_precision[uint8-5]
+FAILED packages/iqa/tests/test_asset_io_remediation_r1.py::test_tiff_orientation_once_preserves_source_precision[uint8-6]
+FAILED packages/iqa/tests/test_asset_io_remediation_r1.py::test_tiff_orientation_once_preserves_source_precision[uint8-7]
+FAILED packages/iqa/tests/test_asset_io_remediation_r1.py::test_tiff_orientation_once_preserves_source_precision[uint8-8]
+FAILED packages/iqa/tests/test_asset_io_remediation_r1.py::test_tiff_orientation_once_preserves_source_precision[uint16-2]
+FAILED packages/iqa/tests/test_asset_io_remediation_r1.py::test_tiff_orientation_once_preserves_source_precision[uint16-3]
+FAILED packages/iqa/tests/test_asset_io_remediation_r1.py::test_tiff_orientation_once_preserves_source_precision[uint16-4]
+FAILED packages/iqa/tests/test_asset_io_remediation_r1.py::test_tiff_orientation_once_preserves_source_precision[uint16-5]
+FAILED packages/iqa/tests/test_asset_io_remediation_r1.py::test_tiff_orientation_once_preserves_source_precision[uint16-6]
+FAILED packages/iqa/tests/test_asset_io_remediation_r1.py::test_tiff_orientation_once_preserves_source_precision[uint16-7]
+FAILED packages/iqa/tests/test_asset_io_remediation_r1.py::test_tiff_orientation_once_preserves_source_precision[uint16-8]
+FAILED packages/iqa/tests/test_asset_io_remediation_r1.py::test_implicit_and_explicit_effective_roi_collision_rejected[B-False-algorithm]
+FAILED packages/iqa/tests/test_asset_io_remediation_r1.py::test_implicit_and_explicit_effective_roi_collision_rejected[B-False-device]
+FAILED packages/iqa/tests/test_asset_io_remediation_r1.py::test_implicit_and_explicit_effective_roi_collision_rejected[B-True-algorithm]
+FAILED packages/iqa/tests/test_asset_io_remediation_r1.py::test_implicit_and_explicit_effective_roi_collision_rejected[B-True-device]
+FAILED packages/iqa/tests/test_asset_io_remediation_r1.py::test_implicit_and_explicit_effective_roi_collision_rejected[C-False-device]
+FAILED packages/iqa/tests/test_asset_io_remediation_r1.py::test_implicit_and_explicit_effective_roi_collision_rejected[C-True-device]
+FAILED packages/iqa/tests/test_asset_io_remediation_r1.py::test_invalid_npy_loader_error_keeps_exact_byte_sha[empty]
+FAILED packages/iqa/tests/test_asset_io_remediation_r1.py::test_invalid_npy_evaluator_returns_finite_invalid_evidence[empty]
+FAILED packages/iqa/tests/test_asset_io_remediation_r1.py::test_invalid_npy_cli_writes_finite_rejection_instead_of_crashing[empty]
+23 failed, 7 passed in 0.76s

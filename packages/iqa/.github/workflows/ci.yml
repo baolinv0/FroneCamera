@@ -1,16 +1,17 @@
-name: Standalone IQA CI
-permissions:
-  contents: read
+name: CI
+
 on:
   push:
+    branches: [main]
   pull_request:
+
+permissions:
+  contents: read
+
 jobs:
-  iqa-verify:
+  verify:
     name: verify (${{ matrix.python-version }})
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: packages/iqa
     strategy:
       fail-fast: false
       matrix:
@@ -35,9 +36,9 @@ jobs:
       - name: V-001 Compile
         run: python -m compileall -q src tests scripts
       - name: V-002 Ruff
-        run: set -o pipefail; python -m ruff check . | tee runs/ci-evidence/ruff.log
+        run: python -m ruff check . | tee runs/ci-evidence/ruff.log
       - name: V-003 Full pytest
-        run: set -o pipefail; python -m pytest -q | tee runs/ci-evidence/pytest.log
+        run: python -m pytest -q | tee runs/ci-evidence/pytest.log
       - name: V-011 through V-018 focused commands
         if: matrix.python-version == '3.12'
         shell: bash
@@ -76,19 +77,16 @@ jobs:
         with:
           name: tmqa-v0.2-mechanical-${{ matrix.python-version }}-${{ env.HEAD_SHA }}
           path: |
-            packages/iqa/runs/ci-evidence
-            packages/iqa/dist
-            packages/iqa/.verification/cli-${{ matrix.python-version }}
-            packages/iqa/runs/verified_experiment
+            runs/ci-evidence
+            dist
+            .verification/cli-${{ matrix.python-version }}
+            runs/verified_experiment
           if-no-files-found: warn
 
-  iqa-exact-head-audit:
+  exact-head-audit:
     name: exact-head audit
-    needs: iqa-verify
+    needs: verify
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: packages/iqa
     env:
       HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
     steps:
@@ -104,7 +102,7 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           name: tmqa-v0.2-mechanical-3.12-${{ env.HEAD_SHA }}
-          path: packages/iqa/aggregate
+          path: aggregate
       - name: Bind behavioral and exact-head CI evidence
         run: >-
           python scripts/generate_verification_evidence.py
@@ -143,4 +141,4 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: tmqa-v0.2-exact-head-audit-${{ env.HEAD_SHA }}
-          path: packages/iqa/aggregate/runs/verified_experiment
+          path: aggregate/runs/verified_experiment

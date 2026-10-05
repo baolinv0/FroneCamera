@@ -1,0 +1,3 @@
+# Task 1 fresh independent Critic, round 3
+
+Verdict PASS_TO_EVALUATOR. Non-editing critic_iqa_compare_r3 CLOSED IQA-R2-01: independentlybuilt66byte20000x20000PNG triggersPillowguardnormalizedAssetDecodeError/exactSHA/count; MAX_IMAGE_PIXELS89478485enabled. Library+installedCLI JSONfinite/CSVcomplete/exit0; invalidcandidateREJECT validsamegroupsiblingREVIEW/MAE0. Installedversionbatchcontinuesvalidsecondscene. R1TIFFprecision/orientation,ROIcollision,NPY andnativeHEIC remainCLOSED via82/82tests; Ruffpass. Soleexplicitcatchreviewed,noadditionalmaterialfindingwithinfinalchangescope. No code/tests/evidence/mode edits.

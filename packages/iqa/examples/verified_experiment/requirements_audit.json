@@ -1,0 +1,12 @@
+{
+  "R1_complete_model_records": true,
+  "R2_prompt_inspector_trace": true,
+  "R3_debug_prompt_visible": true,
+  "R4_blind_review_hides_then_reveals": true,
+  "R5_focused_review_queue": true,
+  "R6_all_dashboard_views": true,
+  "R7_review_service_contract": true,
+  "R8_calibration_and_synthetic_disclosure": true,
+  "R9_explicit_image_manifest": true,
+  "R10_multimodel_and_human_delta": true
+}

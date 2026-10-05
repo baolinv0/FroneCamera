@@ -1,0 +1,479 @@
+# 结论
+
+相较你当前使用的 **Qwen2-VL-7B**，现在已有多种明显更强的开源/开放权重模型。但对 Tone Mapping IQA 来说，不能只按通用 VLM 榜单选模型。
+
+最合理的升级不是：
+
+[
+\text{Qwen2-VL-7B}\rightarrow\text{某个更大的单模型}
+]
+
+而是构建：
+
+[
+\boxed{
+\text{主评分模型}
++
+\text{独立裁判模型}
++
+\text{高分辨率局部检查模型}
+}
+]
+
+我对你当前系统的直接推荐是：
+
+* **主评分器：Qwen3-VL-8B-Instruct**
+* **独立裁判：InternVL3.5-38B**
+* **局部缺陷检查：Ovis2.6-30B-A3B**
+* **低成本批量预筛：MiniCPM-V 4.5**
+* **缺陷定位辅助：Molmo2-8B 或 Qwen3-VL-Seg**
+
+---
+
+# 一、推荐优先级
+
+| 优先级 | 模型                     | 最适合的角色               | 相对 Qwen2-VL 的主要优势                                    |
+| --: | ---------------------- | -------------------- | ---------------------------------------------------- |
+|   1 | Qwen3-VL-8B-Instruct   | 主评分、Pairwise 比较、序列评价 | 综合替换成本最低，图像、多图、长上下文和推理均明显升级                          |
+|   2 | InternVL3.5-8B/38B     | 独立裁判、复杂样本复核          | 与 Qwen 不同模型家族，降低相关错误；推理能力强                           |
+|   3 | Ovis2.6-30B-A3B        | 高分辨率局部缺陷检测           | 原生高分辨率、主动 crop/rotate 复查，适合 halo、banding、局部 clipping |
+|   4 | MiniCPM-V 4.5          | 低成本预筛、批处理            | 8B 模型效率非常高，适合海量数据第一轮过滤                               |
+|   5 | GLM-4.6V/Flash         | 高端裁判、Agent 和工具调用     | 强视觉推理与原生 function calling                            |
+|   6 | Molmo2-8B              | 缺陷区域 grounding       | 能输出点、区域和跟踪结果，适合“问题在哪里”                               |
+|   7 | LLaVA-OneVision-1.5-8B | 可复现训练基线              | 数据、框架和训练流程开放，适合做研究消融                                 |
+
+---
+
+# 二、首选：Qwen3-VL-8B-Instruct
+
+这是对你现有系统最直接的升级。
+
+Qwen3-VL 是 Qwen 系列当前更强的视觉语言模型，提供 2B、4B、8B、32B 和 MoE 等多个版本，原生支持最长 256K 的多模态交错上下文，并通过多层视觉特征整合加强图文对齐。8B 权重采用 Apache-2.0 许可。([arXiv][1])
+
+## 对你的具体价值
+
+### 1. 多图比较能力更合适
+
+你需要同时输入：
+
+[
+Y_0,\quad Y_{\alpha_1},\quad Y_{\alpha_2},\ldots
+]
+
+Qwen3-VL 比 Qwen2-VL 更适合处理多张图之间的：
+
+* 高光变化；
+* 阴影提升；
+* 色彩漂移；
+* 局部结构变化；
+* alpha 响应趋势。
+
+### 2. 可以直接作为 IQA 微调 backbone
+
+Q-REAL 已经选择 Qwen3-VL-8B 作为细粒度图像质量评价 backbone，执行问题定位、质量解释和连续分数预测。该工作发现，未经微调的通用 VLM 对 distortion 和局部问题识别仍然较弱，但经过领域训练后，问题定位和质量相关性显著提高。([arXiv][2])
+
+### 3. 迁移成本最低
+
+你现有 Qwen2-VL 的：
+
+* Prompt 结构；
+* 多图输入；
+* JSON 输出；
+* LoRA 微调；
+* Transformers/vLLM 部署；
+
+大部分可以迁移到 Qwen3-VL。
+
+## 推荐用途
+
+```text
+Stage 3:
+Qwen3-VL-8B-Instruct
+
+任务：
+- 多维 Tone Quality 评价
+- Y0 与 Yα Pairwise 比较
+- alpha 序列趋势分析
+- 结构化问题诊断
+```
+
+## 结论
+
+> **只能选一个模型时，选 Qwen3-VL-8B-Instruct。**
+
+---
+
+# 三、独立裁判：InternVL3.5
+
+InternVL3.5 通过 Cascade RL 增强视觉推理，并引入 Visual Resolution Router 动态调节视觉 token。官方报告称，其相对于 InternVL3 在推理能力和效率上均有明显提升。模型覆盖 8B、38B 和更大 MoE 版本；官方部署说明中，8B 可单卡部署，38B 通常需要两张 A100。([arXiv][3])
+
+## 为什么它适合做 Stage 5
+
+你现在使用：
+
+```text
+Qwen2-VL-7B
+→ Qwen2.5-VL-72B 裁判
+```
+
+这两个模型来自同一 Qwen 家族，可能共享：
+
+* 相似视觉编码偏差；
+* 相似 Prompt 偏差；
+* 相似“更亮即更好”的偏好；
+* 相似质量词汇理解；
+* 相似幻觉模式。
+
+即使两者一致，也不代表判断正确。
+
+更合理的是：
+
+```text
+Qwen3-VL-8B 主评估
+       ↓
+InternVL3.5-38B 独立裁判
+```
+
+这样更接近真正的 model disagreement。
+
+## 推荐版本
+
+### InternVL3.5-8B
+
+适合：
+
+* 与 Qwen3-VL-8B 做双模型投票；
+* 成本有限；
+* 批量数据过滤；
+* 训练领域 LoRA。
+
+### InternVL3.5-38B
+
+适合：
+
+* Stage 5 最终裁判；
+* 极端 HDR；
+* 高光、肤色和局部对比争议样本；
+* 复杂失败原因解释。
+
+## 结论
+
+> **如果能使用两个模型，优先采用 Qwen3-VL-8B + InternVL3.5-38B，而不是同一 Qwen 家族的 8B + 72B。**
+
+---
+
+# 四、高分辨率局部检查：Ovis2.6-30B-A3B
+
+Ovis2.6-30B-A3B 是一个 30B 总参数、约 3B 激活参数的 MoE 模型，采用 Apache-2.0 许可，支持最高 2880×2880 图像和 64K 上下文。它还提供 “Think with Image” 能力，可以在推理过程中主动 crop、rotate 并重新检查图像区域。([Hugging Face][4])
+
+这对 Tone Mapping IQA 很有价值，因为很多关键问题只占很小的区域：
+
+* 天空高光 roll-off；
+* 灯源周围 halo；
+* 平滑墙面或天空 banding；
+* 头发暗部压碎；
+* 人脸局部色偏；
+* 高光颜色漂白；
+* 阴影噪声放大；
+* 物体边缘局部重绘。
+
+## 推荐用法
+
+不要让 Ovis2.6 对每张完整图都进行最终评分，而是用于：
+
+```text
+客观指标或主模型发现可疑区域
+             ↓
+生成局部 Crop
+             ↓
+Ovis2.6 对局部进行细粒度复核
+```
+
+例如：
+
+```text
+Crop 1: brightest 5% highlight region
+Crop 2: darkest 10% shadow region
+Crop 3: face region
+Crop 4: highest input-output difference region
+```
+
+## 注意
+
+Ovis2.6 的高分辨率和主动视觉分析能力，使其成为强候选，但目前没有充分证据证明它在 Tone Mapping 主观评分上必然超过经过领域微调的 Qwen3-VL。因此更适合作为：
+
+> **Local Artifact Inspector，而不是唯一 Overall Scorer。**
+
+---
+
+# 五、低成本批量模型：MiniCPM-V 4.5
+
+MiniCPM-V 4.5 是 8B 模型，支持快速和深度推理模式。其技术报告在综合 OpenCompass 评测中报告了很强的性能和推理效率，并称其 GPU 显存和推理时间显著低于 Qwen2.5-VL-7B。模型权重和代码采用 Apache-2.0 许可。([arXiv][5])
+
+## 最适合你的用途
+
+用于 Stage 2.5：
+
+```text
+传统客观指标
+      ↓
+MiniCPM-V 4.5 快速语义过滤
+      ↓
+只将可疑或高价值样本交给 Qwen3-VL
+```
+
+它可以快速判断：
+
+* 是否存在明显曝光错误；
+* 是否出现严重物体变化；
+* 色彩是否明显异常；
+* 是否存在明显 clipping/crushing；
+* 是否值得进入昂贵模型。
+
+## 不建议
+
+不建议直接把 MiniCPM-V 4.5 作为唯一 Tone Mapping Reward Model。官方综合 benchmark 很强，但这不等价于对细微亮度、色调和局部对比差异特别敏感。
+
+---
+
+# 六、高端裁判：GLM-4.6V
+
+GLM-4.6V 系列包括 106B 主模型和 9B Flash 版本，支持 128K 上下文，并原生支持视觉驱动的 function calling。模型采用 MIT 许可。官方模型卡也明确指出，模型在复杂 Prompt 下仍可能过度思考或重复输出。([Hugging Face][6])
+
+## 优势
+
+它适合把评价和工具组合起来：
+
+```text
+读取图像
+→ 调用直方图工具
+→ 调用高光 mask 工具
+→ 调用 face/sky segmentation
+→ 综合客观指标和视觉判断
+→ 输出裁决
+```
+
+因此它更适合你的未来 Agentic IQA 系统，而不是单纯输出 1–5 分。
+
+## 推荐角色
+
+* Stage 5 高端裁判；
+* 调度客观指标和局部检测工具；
+* 生成数据的反馈修复指令；
+* 处理复杂冲突样本。
+
+## 不足
+
+* 106B 版本部署成本高；
+* 复杂推理可能冗长；
+* 对 Tone Mapping 的细微视觉差异仍需领域数据校准。
+
+---
+
+# 七、缺陷定位：Molmo2-8B
+
+Molmo2 是一个真正强调开放性的模型家族，公开权重、数据和训练代码，并支持单图、多图和视频中的 pointing、tracking 与 grounded output。其 8B 模型在 grounding、计数和一般视觉问答方面较强，但在部分 OCR 和复杂推理 benchmark 上不如最强开放权重模型。([arXiv][7])
+
+## 对你最有价值的能力
+
+让模型不只回答：
+
+```text
+“高光存在问题。”
+```
+
+而是回答：
+
+```text
+“问题位于图像右上方天空区域，中心坐标约为 (0.76, 0.18)。”
+```
+
+可用于：
+
+* 高光裁剪区域定位；
+* halo 区域定位；
+* 变形物体定位；
+* 阴影压碎区域定位；
+* 人脸色偏区域定位；
+* 输入—输出差异区域定位。
+
+Molmo2 不适合作为最终连续评分器，但适合作为：
+
+> **问题在哪里的 Grounding 模型。**
+
+---
+
+# 八、研究和微调基线：LLaVA-OneVision-1.5
+
+LLaVA-OneVision-1.5 强调训练数据、训练框架和模型构建流程的完整开放。官方报告称，其 8B 模型在 27 个通用多模态 benchmark 中有 18 个超过 Qwen2.5-VL-7B。([arXiv][8])
+
+## 它的价值不在于零样本最强
+
+而在于：
+
+* 训练流程更容易复现；
+* 适合修改视觉 token；
+* 适合增加 IQA regression head；
+* 适合做论文中的 backbone 消融；
+* 可以研究视觉 encoder、LLM 和评分头分别贡献什么。
+
+如果你的目标是发表 Qwen-IQA 方法论文，建议至少加入：
+
+```text
+Qwen3-VL-8B
+InternVL3/3.5-8B
+LLaVA-OneVision-1.5-8B
+```
+
+三个 backbone，以证明方法不是只对 Qwen 有效。
+
+---
+
+# 九、针对不同维度的最佳候选
+
+| 评价维度                 | 推荐模型                          | 原因                          |
+| -------------------- | ----------------------------- | --------------------------- |
+| 整体 Tone Quality      | Qwen3-VL-8B 微调版               | 综合能力、部署和微调生态最平衡             |
+| Pairwise A/B 偏好      | Qwen3-VL-8B / InternVL3.5-38B | 多图推理与比较能力较强                 |
+| Alpha 序列评价           | Qwen3-VL-8B/32B               | 长上下文与多图交错输入                 |
+| 高光/暗部局部细节            | Ovis2.6-30B-A3B               | 高分辨率和主动 crop 检查             |
+| 缺陷区域定位               | Molmo2-8B / Qwen3-VL-Seg      | Grounding 或像素级 segmentation |
+| 快速批量过滤               | MiniCPM-V 4.5                 | 推理效率高                       |
+| 最终独立裁判               | InternVL3.5-38B               | 与 Qwen 不同家族                 |
+| Tool-using IQA Agent | GLM-4.6V                      | 原生 function calling         |
+| 方法研究与完全复现            | LLaVA-OneVision-1.5           | 数据、代码和训练流程开放                |
+
+---
+
+# 十、推荐的系统替换方案
+
+## 方案 A：最小改动
+
+```text
+当前：
+Qwen2-VL-7B
++
+Qwen2.5-VL-72B
+
+升级：
+Qwen3-VL-8B
++
+InternVL3.5-38B
+```
+
+这是最推荐的第一步。
+
+### 改动
+
+* Stage 3：换成 Qwen3-VL-8B；
+* Stage 5：换成 InternVL3.5-38B；
+* 保留现有 Prompt、客观指标和流程；
+* 用 200–500 个人工 A/B 样本进行快速验证。
+
+---
+
+## 方案 B：高精度三模型系统
+
+```text
+Qwen3-VL-8B
+主评分、序列分析
+        ↓
+Ovis2.6-30B-A3B
+局部高光/阴影/halo 复核
+        ↓
+InternVL3.5-38B
+独立最终裁判
+```
+
+触发 Ovis 和 InternVL 的条件不是只看采样方差，而是：
+
+* 客观指标与 Qwen 分数冲突；
+* 多模型分歧；
+* 输入—输出差异异常；
+* 极端 alpha；
+* 高光、肤色、文字、人脸等高风险区域。
+
+---
+
+## 方案 C：大规模低成本过滤
+
+```text
+传统指标
+    ↓
+MiniCPM-V 4.5
+明显缺陷快速过滤
+    ↓
+Qwen3-VL-8B
+核心多维评价
+    ↓
+InternVL3.5-38B
+仅处理争议样本
+```
+
+适合 GGT-100K 风格的数据生产。
+
+---
+
+# 十一、一个比更换模型更重要的问题
+
+即使换成 Qwen3-VL、InternVL3.5 或 GLM-4.6V，直接让模型输出：
+
+```text
+1、2、3、4、5
+```
+
+仍然不是理想的连续 IQA 方案。
+
+Q-Scorer指出，MLLM 的离散 token 输出与连续质量分数之间存在天然不匹配，简单将 “Bad/Fair/Good” 转成分数会引入量化和语义混淆。其解决方案是加入专用 score token 和轻量 regression module。([arXiv][9])
+
+因此建议你的 Qwen-IQA 最终采用：
+
+```text
+Qwen3-VL Visual Backbone
+        ↓
+Structured Defect Reasoning
+        ↓
+Pairwise Preference Head
+        +
+Continuous Regression Head
+        +
+Fatal Defect Classification Head
+```
+
+而不是只依赖自然语言生成的 1–5 分。
+
+---
+
+# 十二、最终推荐
+
+## 只换一个模型
+
+**Qwen3-VL-8B-Instruct**
+
+## 使用两个模型
+
+**Qwen3-VL-8B-Instruct + InternVL3.5-38B**
+
+## 构建完整系统
+
+* Qwen3-VL-8B：主评分；
+* InternVL3.5-38B：独立裁判；
+* Ovis2.6-30B-A3B：高分辨率局部检查；
+* MiniCPM-V 4.5：批量预筛；
+* Molmo2-8B：缺陷区域定位。
+
+最重要的判断是：
+
+> **对于 Tone Mapping IQA，领域偏好数据、局部缺陷监督和连续评分头带来的收益，通常会大于单纯从 8B 换到未经微调的 72B。**
+
+可设置每月跟踪一次新发布的开源 VLM及其低层视觉/IQA评测，避免模型选型快速过时。
+
+[1]: https://arxiv.org/abs/2511.21631?utm_source=chatgpt.com "Qwen3-VL Technical Report"
+[2]: https://arxiv.org/html/2511.16908v2 "Q-REAL: Towards Naturalness and Distortion Evaluation for AI-Generated Content"
+[3]: https://arxiv.org/abs/2508.18265?utm_source=chatgpt.com "InternVL3.5: Advancing Open-Source Multimodal Models in Versatility, Reasoning, and Efficiency"
+[4]: https://huggingface.co/ATH-MaaS/Ovis2.6-30B-A3B "ATH-MaaS/Ovis2.6-30B-A3B · Hugging Face"
+[5]: https://arxiv.org/abs/2509.18154 "[2509.18154] MiniCPM-V 4.5: Cooking Efficient MLLMs via Architecture, Data, and Training Recipe"
+[6]: https://huggingface.co/zai-org/GLM-4.6V "zai-org/GLM-4.6V · Hugging Face"
+[7]: https://arxiv.org/html/2601.10611v4 "Molmo2 Open Weights and Data for Vision-Language Models with Video Understanding and Grounding"
+[8]: https://arxiv.org/abs/2509.23661?utm_source=chatgpt.com "LLaVA-OneVision-1.5: Fully Open Framework for Democratized Multimodal Training"
+[9]: https://arxiv.org/abs/2511.07812 "[2511.07812] Revisiting MLLM Based Image Quality Assessment: Errors and Remedy"

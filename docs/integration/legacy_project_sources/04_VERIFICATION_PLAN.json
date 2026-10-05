@@ -1,0 +1,343 @@
+{
+  "document_id": "WORK-VERIFICATION-001",
+  "document_version": "0.2.0",
+  "status": "DRAFT",
+  "schema_version": 1,
+  "project": "Qwen-TMQA",
+  "commands": [
+    {
+      "id": "V-001",
+      "required": true,
+      "category": "syntax",
+      "command": "python -m compileall -q src tests",
+      "working_directory": ".",
+      "expected_exit_code": 0,
+      "timeout_seconds": 300,
+      "supports_live_execution": true,
+      "required_evidence": [
+        "exact command",
+        "exit code",
+        "stdout/stderr log",
+        "Python version"
+      ]
+    },
+    {
+      "id": "V-002",
+      "required": true,
+      "category": "lint",
+      "command": "python -m ruff check .",
+      "working_directory": ".",
+      "expected_exit_code": 0,
+      "timeout_seconds": 300,
+      "supports_live_execution": true,
+      "required_evidence": [
+        "exact command",
+        "exit code",
+        "Ruff version",
+        "stdout/stderr log"
+      ]
+    },
+    {
+      "id": "V-003",
+      "required": true,
+      "category": "unit_and_integration",
+      "command": "python -m pytest -q",
+      "working_directory": ".",
+      "expected_exit_code": 0,
+      "timeout_seconds": 1800,
+      "supports_live_execution": true,
+      "required_evidence": [
+        "exact command",
+        "exit code",
+        "full test count",
+        "duration",
+        "stdout/stderr log",
+        "environment summary"
+      ]
+    },
+    {
+      "id": "V-004",
+      "required": true,
+      "category": "package_build",
+      "command": "python -m build",
+      "working_directory": ".",
+      "expected_exit_code": 0,
+      "timeout_seconds": 900,
+      "supports_live_execution": true,
+      "required_evidence": [
+        "exact command",
+        "exit code",
+        "sdist path/hash",
+        "wheel path/hash",
+        "build log"
+      ]
+    },
+    {
+      "id": "V-005",
+      "required": true,
+      "category": "isolated_install",
+      "command": "python scripts/verify_wheel_install.py --dist dist --target .verification/wheel_target --expected-version 0.2.0",
+      "working_directory": ".",
+      "expected_exit_code": 0,
+      "timeout_seconds": 900,
+      "supports_live_execution": true,
+      "required_evidence": [
+        "exact command",
+        "exit code",
+        "installed wheel path/hash",
+        "imported module path",
+        "reported version"
+      ]
+    },
+    {
+      "id": "V-006",
+      "required": true,
+      "category": "cli_smoke",
+      "command": "python scripts/verify_cli_contract.py --config configs/default.yaml --workdir .verification/cli",
+      "working_directory": ".",
+      "expected_exit_code": 0,
+      "timeout_seconds": 1800,
+      "supports_live_execution": true,
+      "required_evidence": [
+        "all eight CLI commands",
+        "positive and negative exit codes",
+        "stdout/stderr logs",
+        "generated files"
+      ]
+    },
+    {
+      "id": "V-007",
+      "required": true,
+      "category": "synthetic_end_to_end",
+      "command": "bash scripts/run_verified_experiment.sh runs/verified_experiment",
+      "working_directory": ".",
+      "expected_exit_code": 0,
+      "timeout_seconds": 3600,
+      "supports_live_execution": true,
+      "required_evidence": [
+        "exact command",
+        "exit code",
+        "evaluations.json",
+        "summary.json",
+        "dashboard",
+        "reviews",
+        "calibration",
+        "experiment manifest",
+        "deterministic rerun comparison"
+      ]
+    },
+    {
+      "id": "V-008",
+      "required": true,
+      "category": "dashboard_javascript",
+      "command": "python scripts/check_dashboard_javascript.py runs/verified_experiment/dashboard/index.html",
+      "working_directory": ".",
+      "expected_exit_code": 0,
+      "timeout_seconds": 300,
+      "supports_live_execution": true,
+      "required_evidence": [
+        "extracted script hash",
+        "node version",
+        "node --check exit code",
+        "log"
+      ]
+    },
+    {
+      "id": "V-009",
+      "required": true,
+      "category": "requirements_audit",
+      "command": "qwen-tmqa audit --results runs/verified_experiment/results/evaluations.json --dashboard runs/verified_experiment/dashboard --reviews runs/verified_experiment/reviews.jsonl --calibration runs/verified_experiment/calibration.json --output runs/verified_experiment/requirements_audit.json",
+      "working_directory": ".",
+      "expected_exit_code": 0,
+      "timeout_seconds": 600,
+      "supports_live_execution": true,
+      "required_evidence": [
+        "audit file",
+        "19/19 MUST PASS",
+        "overall PASS",
+        "injected-failure test evidence"
+      ]
+    },
+    {
+      "id": "V-011",
+      "required": true,
+      "category": "dataset_contract",
+      "command": "python -m pytest -q -k 'strict_complete or expected_levels or non_image or recursive'",
+      "working_directory": ".",
+      "expected_exit_code": 0,
+      "timeout_seconds": 600,
+      "supports_live_execution": true,
+      "required_evidence": [
+        "test node IDs",
+        "positive/negative cases",
+        "pytest log"
+      ]
+    },
+    {
+      "id": "V-012",
+      "required": true,
+      "category": "judge_contract",
+      "command": "python -m pytest -q -k 'judge or openai_adapter or score_contract or model_failure'",
+      "working_directory": ".",
+      "expected_exit_code": 0,
+      "timeout_seconds": 900,
+      "supports_live_execution": true,
+      "required_evidence": [
+        "test node IDs",
+        "malformed/incomplete/unavailable cases",
+        "pytest log"
+      ]
+    },
+    {
+      "id": "V-013",
+      "required": true,
+      "category": "payload_trace",
+      "command": "python -m pytest -q -k 'payload_hash or input_manifest or exif_orientation or image_payload'",
+      "working_directory": ".",
+      "expected_exit_code": 0,
+      "timeout_seconds": 600,
+      "supports_live_execution": true,
+      "required_evidence": [
+        "test node IDs",
+        "captured request manifest",
+        "source/payload hashes",
+        "pytest log"
+      ]
+    },
+    {
+      "id": "V-014",
+      "required": true,
+      "category": "prompt_versioning",
+      "command": "python -m pytest -q -k 'prompt_version or immutable_prompt or output_schema_version'",
+      "working_directory": ".",
+      "expected_exit_code": 0,
+      "timeout_seconds": 600,
+      "supports_live_execution": true,
+      "required_evidence": [
+        "historical fixture hashes",
+        "old/new load test",
+        "diff output",
+        "pytest log"
+      ]
+    },
+    {
+      "id": "V-015",
+      "required": true,
+      "category": "decision_safety",
+      "command": "python -m pytest -q -k 'fatal or all_unavailable or decision_disagreement or unanimous_reject or unanimous_regenerate'",
+      "working_directory": ".",
+      "expected_exit_code": 0,
+      "timeout_seconds": 600,
+      "supports_live_execution": true,
+      "required_evidence": [
+        "test node IDs",
+        "expected/actual decisions",
+        "threshold/config provenance",
+        "pytest log"
+      ]
+    },
+    {
+      "id": "V-016",
+      "required": true,
+      "category": "blind_review_and_server",
+      "command": "python -m pytest -q -k 'blind_review or reviewer_payload or reveal_api or review_server or focused_queue or received_at'",
+      "working_directory": ".",
+      "expected_exit_code": 0,
+      "timeout_seconds": 1200,
+      "supports_live_execution": true,
+      "required_evidence": [
+        "network/browser integration results",
+        "forbidden-field scan",
+        "HTTP status probes",
+        "failed-storage no-reveal evidence",
+        "pytest log"
+      ]
+    },
+    {
+      "id": "V-017",
+      "required": true,
+      "category": "dashboard_functional",
+      "command": "python -m pytest -q -k 'dashboard or visualization or prompt_inspector or model_human_delta'",
+      "working_directory": ".",
+      "expected_exit_code": 0,
+      "timeout_seconds": 900,
+      "supports_live_execution": true,
+      "required_evidence": [
+        "functional test node IDs",
+        "generated dashboard path",
+        "UTF-8 probe",
+        "interaction assertions",
+        "pytest log"
+      ]
+    },
+    {
+      "id": "V-018",
+      "required": true,
+      "category": "calibration_isolation",
+      "command": "python -m pytest -q -k 'calibration and (synthetic or reviewer or reliability or fusion)'",
+      "working_directory": ".",
+      "expected_exit_code": 0,
+      "timeout_seconds": 900,
+      "supports_live_execution": true,
+      "required_evidence": [
+        "pure real/pure synthetic/mixed cases",
+        "weight normalization",
+        "review counts/types",
+        "pytest log"
+      ]
+    },
+    {
+      "id": "V-019",
+      "required": true,
+      "category": "secret_and_security_scan",
+      "command": "python scripts/verify_no_secret_leakage.py runs/verified_experiment",
+      "working_directory": ".",
+      "expected_exit_code": 0,
+      "timeout_seconds": 300,
+      "supports_live_execution": true,
+      "required_evidence": [
+        "scanned paths",
+        "forbidden patterns",
+        "exit code",
+        "log"
+      ]
+    }
+  ],
+  "non_command_checks": [
+    {
+      "id": "N-001",
+      "required": true,
+      "category": "requirement_traceability",
+      "method": "Map every MUST requirement R-001..R-019 to implementation, test, execution command, measurable threshold, actual evidence, and final status.",
+      "pass_threshold": "19/19 MUST requirements have complete traceability and PASS; no evidence field is empty."
+    },
+    {
+      "id": "N-002",
+      "required": true,
+      "category": "anti_cheating",
+      "method": "Inspect for deleted/weakened tests, skips, xfails, threshold changes, test-specific hard coding, silent fallback, synthetic/real relabeling, and audit-by-string-only.",
+      "pass_threshold": "No unapproved bypass or weakened equivalent is present."
+    },
+    {
+      "id": "N-003",
+      "required": true,
+      "category": "branch_head_ci",
+      "method": "Verify required GitHub Actions jobs on the exact branch-head commit for Python 3.10 and 3.12.",
+      "pass_threshold": "All required jobs are completed/success and tested SHA equals branch-head SHA."
+    },
+    {
+      "id": "N-004",
+      "required": true,
+      "category": "evidence_boundary",
+      "method": "Review README, Dashboard, experiment report, calibration output, and release notes for synthetic/real disclosure and prohibited claims.",
+      "pass_threshold": "All artifacts disclose evidence type; zero unsupported real-model, production-weight, trained-reward, or physical-HDR claims."
+    },
+    {
+      "id": "N-005",
+      "required": true,
+      "category": "independent_review",
+      "method": "Independent Critic reviews code and evidence without editing; Fresh Evaluator independently adjudicates the frozen requirements after Critic PASS_TO_EVALUATOR.",
+      "pass_threshold": "Latest Critic verdict PASS_TO_EVALUATOR; Fresh Evaluator verdict PASS; unresolved P0/P1=0; unresolved P2 all human-accepted."
+    }
+  ]
+}

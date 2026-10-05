@@ -1,0 +1,37 @@
+{
+  "document_id": "WORK-SPEC-BASELINE-001",
+  "document_version": "1.2.0",
+  "schema_version": 1,
+  "spec_version": "0.2.0",
+  "status": "FROZEN",
+  "approved_by_type": "HUMAN",
+  "approved_by": "Human",
+  "approved_at_utc": "2026-07-17T01:27:53Z",
+  "execution_profile": "WORK_CHATGPT_PROJECT",
+  "task_type": "IMPLEMENTATION_AND_REVIEW",
+  "source_binding": {
+    "requirements": {
+      "path": "workflow/02_ORIGINAL_REQUIREMENTS.md",
+      "document_id": "WORK-REQUIREMENTS-001",
+      "document_version": "0.2.0",
+      "sha256": "8fb87f9b510ad059cd6bef3bcdc98f95a960f1755d58aa393f03ec37547c671c"
+    },
+    "acceptance_matrix": {
+      "path": "workflow/03_ACCEPTANCE_MATRIX.csv",
+      "document_id": "WORK-ACCEPTANCE-001",
+      "document_version": "0.2.0",
+      "sha256": "5beb108d9a9712d78c9b2221d527b25979ae5dec64ccabc9d351aee23d7f624a"
+    },
+    "verification_plan": {
+      "path": "workflow/04_VERIFICATION_PLAN.json",
+      "document_id": "WORK-VERIFICATION-001",
+      "document_version": "0.2.0",
+      "sha256": "7674a876557153886857c5a03bc2587c2fd3f888762b580b40b01ce21a0fbd81"
+    }
+  },
+  "freeze_instructions": [
+    "This specification baseline is human-frozen.",
+    "Builder, Critic, and Evaluator must use the exact bound source versions and hashes.",
+    "Any later requirement, scope, threshold, interface, or verification change requires a recorded change request, a spec-version increment, refreshed source hashes, and new human approval."
+  ]
+}

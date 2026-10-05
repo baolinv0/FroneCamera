@@ -1,0 +1,55 @@
+{
+  "scene_id": "reproducible-array-fixture",
+  "group_id": "fixture-only-not-production-canonical",
+  "mode": "algorithm",
+  "split": "audit",
+  "source": {
+    "id": "source",
+    "path": "source.npy",
+    "encoding": "linear"
+  },
+  "baseline": {
+    "id": "B",
+    "path": "baseline.png",
+    "encoding": "srgb",
+    "source_sha256": "5605e818472b94d1d06efb727b0e002cbfd28bcbba71b8c7a5546368ed65ace6"
+  },
+  "candidates": [
+    {
+      "id": "C16",
+      "path": "candidate-16bit.png",
+      "encoding": "srgb",
+      "source_sha256": "5605e818472b94d1d06efb727b0e002cbfd28bcbba71b8c7a5546368ed65ace6"
+    },
+    {
+      "id": "destroyed-face",
+      "path": "candidate-local-collapse.png",
+      "encoding": "srgb",
+      "source_sha256": "5605e818472b94d1d06efb727b0e002cbfd28bcbba71b8c7a5546368ed65ace6"
+    }
+  ],
+  "rois": [
+    {
+      "id": "face-one",
+      "kind": "face",
+      "bbox": [
+        8,
+        8,
+        16,
+        16
+      ],
+      "person_id": "one"
+    },
+    {
+      "id": "face-two",
+      "kind": "face",
+      "bbox": [
+        40,
+        40,
+        16,
+        16
+      ],
+      "person_id": "two"
+    }
+  ]
+}

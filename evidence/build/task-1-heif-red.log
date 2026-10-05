@@ -1,0 +1,473 @@
+FFFFF                                                                    [100%]
+=================================== FAILURES ===================================
+__________ test_actual_heic_8bit_matches_front_display_orientation[1] __________
+
+asset = ComparisonAsset(id='capture', path=PosixPath('/tmp/pytest-of-root/pytest-250/test_actual_heic_8bit_matches_0/capture.heic'), encoding='srgb', source_sha256=None)
+
+    def load_comparison_asset(asset: ComparisonAsset) -> LoadedComparisonAsset:
+        data = asset.path.read_bytes()
+        trace: dict[str, object] = {
+            "asset_id": asset.id,
+            "path": str(asset.path),
+            "source_bytes_sha256": hashlib.sha256(data).hexdigest(),
+            "byte_count": len(data),
+            "encoding": asset.encoding,
+            "declared_source_sha256": asset.source_sha256,
+        }
+        try:
+>           return _decode(asset, data, trace)
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+packages/iqa/src/qwen_tmqa/asset_io.py:60: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+asset = ComparisonAsset(id='capture', path=PosixPath('/tmp/pytest-of-root/pytest-250/test_actual_heic_8bit_matches_0/capture.heic'), encoding='srgb', source_sha256=None)
+data = b'\x00\x00\x00\x1cftypheix\x00\x00\x00\x00mif1heixmiaf\x00\x00\x01\xbfmeta\x00\x00\x00\x00\x00\x00\x00!hdlr\x00\x00\x0...x00\x00\x06Exif\x00\x00MM\x00*\x00\x00\x00\x08\x00\x01\x01\x12\x00\x03\x00\x00\x00\x01\x00\x01\x00\x00\x00\x00\x00\x00'
+trace = {'asset_id': 'capture', 'path': '/tmp/pytest-of-root/pytest-250/test_actual_heic_8bit_matches_0/capture.heic', 'source_bytes_sha256': '256427762430fa0d85c45a75ffddbbe3511a33ebe37eeb309258a2e670aab6fe', 'byte_count': 6390, ...}
+
+    def _decode(asset: ComparisonAsset, data: bytes, trace: dict[str, object]) -> LoadedComparisonAsset:
+        orientation = 1
+        warnings: list[str] = []
+        if asset.path.suffix.lower() == ".npy":
+            raw = np.load(io.BytesIO(data), allow_pickle=False)
+            decoder = "numpy_safe"
+            if not isinstance(raw, np.ndarray):
+                if hasattr(raw, "close"):
+                    raw.close()
+                raise ValueError("numpy_asset_requires_single_array")
+        else:
+            try:
+                with Image.open(io.BytesIO(data)) as image:
+                    orientation = int(image.getexif().get(274, 1))
+                    if image.info.get("icc_profile"):
+                        warnings.append("embedded_icc_not_applied_declared_encoding_used")
+            except (UnidentifiedImageError, OSError):
+                pass  # OpenCV also supports HDR formats unsupported by Pillow.
+            decoder_data = _neutralize_tiff_orientation(data)
+            raw = cv2.imdecode(np.frombuffer(decoder_data, np.uint8), cv2.IMREAD_UNCHANGED)
+            decoder = "opencv_unchanged"
+            if decoder_data != data:
+                decoder = "opencv_unchanged_tiff_orientation_neutralized"
+            if raw is None:
+>               raise ValueError("image_decode_failed")
+E               ValueError: image_decode_failed
+
+packages/iqa/src/qwen_tmqa/asset_io.py:136: ValueError
+
+The above exception was the direct cause of the following exception:
+
+tmp_path = PosixPath('/tmp/pytest-of-root/pytest-250/test_actual_heic_8bit_matches_0')
+orientation = 1
+
+    @pytest.mark.parametrize('orientation', [1, 2, 6, 8])
+    def test_actual_heic_8bit_matches_front_display_orientation(tmp_path, orientation):
+        pillow_heif.register_heif_opener()
+        rgb = np.random.default_rng(901).integers(0, 255, (24, 40, 3), dtype=np.uint8)
+        exif = Image.Exif()
+        exif[274] = orientation
+        path = tmp_path / 'capture.heic'
+        Image.fromarray(rgb).save(path, format='HEIF', quality=-1, chroma=444, exif=exif)
+        with Image.open(path) as image:
+            expected = np.asarray(ImageOps.exif_transpose(image).convert('RGB')).copy()
+>       loaded = load_comparison_asset(ComparisonAsset(id='capture', path=path))
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+packages/iqa/tests/test_asset_io_heif.py:25: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+asset = ComparisonAsset(id='capture', path=PosixPath('/tmp/pytest-of-root/pytest-250/test_actual_heic_8bit_matches_0/capture.heic'), encoding='srgb', source_sha256=None)
+
+    def load_comparison_asset(asset: ComparisonAsset) -> LoadedComparisonAsset:
+        data = asset.path.read_bytes()
+        trace: dict[str, object] = {
+            "asset_id": asset.id,
+            "path": str(asset.path),
+            "source_bytes_sha256": hashlib.sha256(data).hexdigest(),
+            "byte_count": len(data),
+            "encoding": asset.encoding,
+            "declared_source_sha256": asset.source_sha256,
+        }
+        try:
+            return _decode(asset, data, trace)
+        except (ValueError, OSError, EOFError, cv2.error, OverflowError) as exc:
+>           raise AssetDecodeError(str(exc), trace) from exc
+E           qwen_tmqa.asset_io.AssetDecodeError: image_decode_failed
+
+packages/iqa/src/qwen_tmqa/asset_io.py:62: AssetDecodeError
+__________ test_actual_heic_8bit_matches_front_display_orientation[2] __________
+
+asset = ComparisonAsset(id='capture', path=PosixPath('/tmp/pytest-of-root/pytest-250/test_actual_heic_8bit_matches_1/capture.heic'), encoding='srgb', source_sha256=None)
+
+    def load_comparison_asset(asset: ComparisonAsset) -> LoadedComparisonAsset:
+        data = asset.path.read_bytes()
+        trace: dict[str, object] = {
+            "asset_id": asset.id,
+            "path": str(asset.path),
+            "source_bytes_sha256": hashlib.sha256(data).hexdigest(),
+            "byte_count": len(data),
+            "encoding": asset.encoding,
+            "declared_source_sha256": asset.source_sha256,
+        }
+        try:
+>           return _decode(asset, data, trace)
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+packages/iqa/src/qwen_tmqa/asset_io.py:60: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+asset = ComparisonAsset(id='capture', path=PosixPath('/tmp/pytest-of-root/pytest-250/test_actual_heic_8bit_matches_1/capture.heic'), encoding='srgb', source_sha256=None)
+data = b'\x00\x00\x00\x1cftypheix\x00\x00\x00\x00mif1heixmiaf\x00\x00\x01\xbfmeta\x00\x00\x00\x00\x00\x00\x00!hdlr\x00\x00\x0...x00\x00\x06Exif\x00\x00MM\x00*\x00\x00\x00\x08\x00\x01\x01\x12\x00\x03\x00\x00\x00\x01\x00\x02\x00\x00\x00\x00\x00\x00'
+trace = {'asset_id': 'capture', 'path': '/tmp/pytest-of-root/pytest-250/test_actual_heic_8bit_matches_1/capture.heic', 'source_bytes_sha256': 'a6abc089462dcfe2e56bcc4e1d5516570e1dc8b46f5c9fec90e2dcaf7d22f95e', 'byte_count': 6390, ...}
+
+    def _decode(asset: ComparisonAsset, data: bytes, trace: dict[str, object]) -> LoadedComparisonAsset:
+        orientation = 1
+        warnings: list[str] = []
+        if asset.path.suffix.lower() == ".npy":
+            raw = np.load(io.BytesIO(data), allow_pickle=False)
+            decoder = "numpy_safe"
+            if not isinstance(raw, np.ndarray):
+                if hasattr(raw, "close"):
+                    raw.close()
+                raise ValueError("numpy_asset_requires_single_array")
+        else:
+            try:
+                with Image.open(io.BytesIO(data)) as image:
+                    orientation = int(image.getexif().get(274, 1))
+                    if image.info.get("icc_profile"):
+                        warnings.append("embedded_icc_not_applied_declared_encoding_used")
+            except (UnidentifiedImageError, OSError):
+                pass  # OpenCV also supports HDR formats unsupported by Pillow.
+            decoder_data = _neutralize_tiff_orientation(data)
+            raw = cv2.imdecode(np.frombuffer(decoder_data, np.uint8), cv2.IMREAD_UNCHANGED)
+            decoder = "opencv_unchanged"
+            if decoder_data != data:
+                decoder = "opencv_unchanged_tiff_orientation_neutralized"
+            if raw is None:
+>               raise ValueError("image_decode_failed")
+E               ValueError: image_decode_failed
+
+packages/iqa/src/qwen_tmqa/asset_io.py:136: ValueError
+
+The above exception was the direct cause of the following exception:
+
+tmp_path = PosixPath('/tmp/pytest-of-root/pytest-250/test_actual_heic_8bit_matches_1')
+orientation = 2
+
+    @pytest.mark.parametrize('orientation', [1, 2, 6, 8])
+    def test_actual_heic_8bit_matches_front_display_orientation(tmp_path, orientation):
+        pillow_heif.register_heif_opener()
+        rgb = np.random.default_rng(901).integers(0, 255, (24, 40, 3), dtype=np.uint8)
+        exif = Image.Exif()
+        exif[274] = orientation
+        path = tmp_path / 'capture.heic'
+        Image.fromarray(rgb).save(path, format='HEIF', quality=-1, chroma=444, exif=exif)
+        with Image.open(path) as image:
+            expected = np.asarray(ImageOps.exif_transpose(image).convert('RGB')).copy()
+>       loaded = load_comparison_asset(ComparisonAsset(id='capture', path=path))
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+packages/iqa/tests/test_asset_io_heif.py:25: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+asset = ComparisonAsset(id='capture', path=PosixPath('/tmp/pytest-of-root/pytest-250/test_actual_heic_8bit_matches_1/capture.heic'), encoding='srgb', source_sha256=None)
+
+    def load_comparison_asset(asset: ComparisonAsset) -> LoadedComparisonAsset:
+        data = asset.path.read_bytes()
+        trace: dict[str, object] = {
+            "asset_id": asset.id,
+            "path": str(asset.path),
+            "source_bytes_sha256": hashlib.sha256(data).hexdigest(),
+            "byte_count": len(data),
+            "encoding": asset.encoding,
+            "declared_source_sha256": asset.source_sha256,
+        }
+        try:
+            return _decode(asset, data, trace)
+        except (ValueError, OSError, EOFError, cv2.error, OverflowError) as exc:
+>           raise AssetDecodeError(str(exc), trace) from exc
+E           qwen_tmqa.asset_io.AssetDecodeError: image_decode_failed
+
+packages/iqa/src/qwen_tmqa/asset_io.py:62: AssetDecodeError
+__________ test_actual_heic_8bit_matches_front_display_orientation[6] __________
+
+asset = ComparisonAsset(id='capture', path=PosixPath('/tmp/pytest-of-root/pytest-250/test_actual_heic_8bit_matches_2/capture.heic'), encoding='srgb', source_sha256=None)
+
+    def load_comparison_asset(asset: ComparisonAsset) -> LoadedComparisonAsset:
+        data = asset.path.read_bytes()
+        trace: dict[str, object] = {
+            "asset_id": asset.id,
+            "path": str(asset.path),
+            "source_bytes_sha256": hashlib.sha256(data).hexdigest(),
+            "byte_count": len(data),
+            "encoding": asset.encoding,
+            "declared_source_sha256": asset.source_sha256,
+        }
+        try:
+>           return _decode(asset, data, trace)
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+packages/iqa/src/qwen_tmqa/asset_io.py:60: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+asset = ComparisonAsset(id='capture', path=PosixPath('/tmp/pytest-of-root/pytest-250/test_actual_heic_8bit_matches_2/capture.heic'), encoding='srgb', source_sha256=None)
+data = b'\x00\x00\x00\x1cftypheix\x00\x00\x00\x00mif1heixmiaf\x00\x00\x01\xbfmeta\x00\x00\x00\x00\x00\x00\x00!hdlr\x00\x00\x0...x00\x00\x06Exif\x00\x00MM\x00*\x00\x00\x00\x08\x00\x01\x01\x12\x00\x03\x00\x00\x00\x01\x00\x06\x00\x00\x00\x00\x00\x00'
+trace = {'asset_id': 'capture', 'path': '/tmp/pytest-of-root/pytest-250/test_actual_heic_8bit_matches_2/capture.heic', 'source_bytes_sha256': 'ee5808b14e0bc0eae9debf58d518f7b60ae3673a03f3d64453a739436a0db94d', 'byte_count': 6390, ...}
+
+    def _decode(asset: ComparisonAsset, data: bytes, trace: dict[str, object]) -> LoadedComparisonAsset:
+        orientation = 1
+        warnings: list[str] = []
+        if asset.path.suffix.lower() == ".npy":
+            raw = np.load(io.BytesIO(data), allow_pickle=False)
+            decoder = "numpy_safe"
+            if not isinstance(raw, np.ndarray):
+                if hasattr(raw, "close"):
+                    raw.close()
+                raise ValueError("numpy_asset_requires_single_array")
+        else:
+            try:
+                with Image.open(io.BytesIO(data)) as image:
+                    orientation = int(image.getexif().get(274, 1))
+                    if image.info.get("icc_profile"):
+                        warnings.append("embedded_icc_not_applied_declared_encoding_used")
+            except (UnidentifiedImageError, OSError):
+                pass  # OpenCV also supports HDR formats unsupported by Pillow.
+            decoder_data = _neutralize_tiff_orientation(data)
+            raw = cv2.imdecode(np.frombuffer(decoder_data, np.uint8), cv2.IMREAD_UNCHANGED)
+            decoder = "opencv_unchanged"
+            if decoder_data != data:
+                decoder = "opencv_unchanged_tiff_orientation_neutralized"
+            if raw is None:
+>               raise ValueError("image_decode_failed")
+E               ValueError: image_decode_failed
+
+packages/iqa/src/qwen_tmqa/asset_io.py:136: ValueError
+
+The above exception was the direct cause of the following exception:
+
+tmp_path = PosixPath('/tmp/pytest-of-root/pytest-250/test_actual_heic_8bit_matches_2')
+orientation = 6
+
+    @pytest.mark.parametrize('orientation', [1, 2, 6, 8])
+    def test_actual_heic_8bit_matches_front_display_orientation(tmp_path, orientation):
+        pillow_heif.register_heif_opener()
+        rgb = np.random.default_rng(901).integers(0, 255, (24, 40, 3), dtype=np.uint8)
+        exif = Image.Exif()
+        exif[274] = orientation
+        path = tmp_path / 'capture.heic'
+        Image.fromarray(rgb).save(path, format='HEIF', quality=-1, chroma=444, exif=exif)
+        with Image.open(path) as image:
+            expected = np.asarray(ImageOps.exif_transpose(image).convert('RGB')).copy()
+>       loaded = load_comparison_asset(ComparisonAsset(id='capture', path=path))
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+packages/iqa/tests/test_asset_io_heif.py:25: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+asset = ComparisonAsset(id='capture', path=PosixPath('/tmp/pytest-of-root/pytest-250/test_actual_heic_8bit_matches_2/capture.heic'), encoding='srgb', source_sha256=None)
+
+    def load_comparison_asset(asset: ComparisonAsset) -> LoadedComparisonAsset:
+        data = asset.path.read_bytes()
+        trace: dict[str, object] = {
+            "asset_id": asset.id,
+            "path": str(asset.path),
+            "source_bytes_sha256": hashlib.sha256(data).hexdigest(),
+            "byte_count": len(data),
+            "encoding": asset.encoding,
+            "declared_source_sha256": asset.source_sha256,
+        }
+        try:
+            return _decode(asset, data, trace)
+        except (ValueError, OSError, EOFError, cv2.error, OverflowError) as exc:
+>           raise AssetDecodeError(str(exc), trace) from exc
+E           qwen_tmqa.asset_io.AssetDecodeError: image_decode_failed
+
+packages/iqa/src/qwen_tmqa/asset_io.py:62: AssetDecodeError
+__________ test_actual_heic_8bit_matches_front_display_orientation[8] __________
+
+asset = ComparisonAsset(id='capture', path=PosixPath('/tmp/pytest-of-root/pytest-250/test_actual_heic_8bit_matches_3/capture.heic'), encoding='srgb', source_sha256=None)
+
+    def load_comparison_asset(asset: ComparisonAsset) -> LoadedComparisonAsset:
+        data = asset.path.read_bytes()
+        trace: dict[str, object] = {
+            "asset_id": asset.id,
+            "path": str(asset.path),
+            "source_bytes_sha256": hashlib.sha256(data).hexdigest(),
+            "byte_count": len(data),
+            "encoding": asset.encoding,
+            "declared_source_sha256": asset.source_sha256,
+        }
+        try:
+>           return _decode(asset, data, trace)
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+packages/iqa/src/qwen_tmqa/asset_io.py:60: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+asset = ComparisonAsset(id='capture', path=PosixPath('/tmp/pytest-of-root/pytest-250/test_actual_heic_8bit_matches_3/capture.heic'), encoding='srgb', source_sha256=None)
+data = b'\x00\x00\x00\x1cftypheix\x00\x00\x00\x00mif1heixmiaf\x00\x00\x01\xbfmeta\x00\x00\x00\x00\x00\x00\x00!hdlr\x00\x00\x0...x00\x00\x06Exif\x00\x00MM\x00*\x00\x00\x00\x08\x00\x01\x01\x12\x00\x03\x00\x00\x00\x01\x00\x08\x00\x00\x00\x00\x00\x00'
+trace = {'asset_id': 'capture', 'path': '/tmp/pytest-of-root/pytest-250/test_actual_heic_8bit_matches_3/capture.heic', 'source_bytes_sha256': 'cc89baeba82235c0a67b10f1bcff38882befbe7dd1677d09eeb1154919f61c63', 'byte_count': 6390, ...}
+
+    def _decode(asset: ComparisonAsset, data: bytes, trace: dict[str, object]) -> LoadedComparisonAsset:
+        orientation = 1
+        warnings: list[str] = []
+        if asset.path.suffix.lower() == ".npy":
+            raw = np.load(io.BytesIO(data), allow_pickle=False)
+            decoder = "numpy_safe"
+            if not isinstance(raw, np.ndarray):
+                if hasattr(raw, "close"):
+                    raw.close()
+                raise ValueError("numpy_asset_requires_single_array")
+        else:
+            try:
+                with Image.open(io.BytesIO(data)) as image:
+                    orientation = int(image.getexif().get(274, 1))
+                    if image.info.get("icc_profile"):
+                        warnings.append("embedded_icc_not_applied_declared_encoding_used")
+            except (UnidentifiedImageError, OSError):
+                pass  # OpenCV also supports HDR formats unsupported by Pillow.
+            decoder_data = _neutralize_tiff_orientation(data)
+            raw = cv2.imdecode(np.frombuffer(decoder_data, np.uint8), cv2.IMREAD_UNCHANGED)
+            decoder = "opencv_unchanged"
+            if decoder_data != data:
+                decoder = "opencv_unchanged_tiff_orientation_neutralized"
+            if raw is None:
+>               raise ValueError("image_decode_failed")
+E               ValueError: image_decode_failed
+
+packages/iqa/src/qwen_tmqa/asset_io.py:136: ValueError
+
+The above exception was the direct cause of the following exception:
+
+tmp_path = PosixPath('/tmp/pytest-of-root/pytest-250/test_actual_heic_8bit_matches_3')
+orientation = 8
+
+    @pytest.mark.parametrize('orientation', [1, 2, 6, 8])
+    def test_actual_heic_8bit_matches_front_display_orientation(tmp_path, orientation):
+        pillow_heif.register_heif_opener()
+        rgb = np.random.default_rng(901).integers(0, 255, (24, 40, 3), dtype=np.uint8)
+        exif = Image.Exif()
+        exif[274] = orientation
+        path = tmp_path / 'capture.heic'
+        Image.fromarray(rgb).save(path, format='HEIF', quality=-1, chroma=444, exif=exif)
+        with Image.open(path) as image:
+            expected = np.asarray(ImageOps.exif_transpose(image).convert('RGB')).copy()
+>       loaded = load_comparison_asset(ComparisonAsset(id='capture', path=path))
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+packages/iqa/tests/test_asset_io_heif.py:25: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+asset = ComparisonAsset(id='capture', path=PosixPath('/tmp/pytest-of-root/pytest-250/test_actual_heic_8bit_matches_3/capture.heic'), encoding='srgb', source_sha256=None)
+
+    def load_comparison_asset(asset: ComparisonAsset) -> LoadedComparisonAsset:
+        data = asset.path.read_bytes()
+        trace: dict[str, object] = {
+            "asset_id": asset.id,
+            "path": str(asset.path),
+            "source_bytes_sha256": hashlib.sha256(data).hexdigest(),
+            "byte_count": len(data),
+            "encoding": asset.encoding,
+            "declared_source_sha256": asset.source_sha256,
+        }
+        try:
+            return _decode(asset, data, trace)
+        except (ValueError, OSError, EOFError, cv2.error, OverflowError) as exc:
+>           raise AssetDecodeError(str(exc), trace) from exc
+E           qwen_tmqa.asset_io.AssetDecodeError: image_decode_failed
+
+packages/iqa/src/qwen_tmqa/asset_io.py:62: AssetDecodeError
+__________ test_actual_10bit_heic_keeps_more_than_256_decoded_levels ___________
+
+asset = ComparisonAsset(id='capture10', path=PosixPath('/tmp/pytest-of-root/pytest-250/test_actual_10bit_heic_keeps_m0/capture-10bit.heic'), encoding='srgb', source_sha256=None)
+
+    def load_comparison_asset(asset: ComparisonAsset) -> LoadedComparisonAsset:
+        data = asset.path.read_bytes()
+        trace: dict[str, object] = {
+            "asset_id": asset.id,
+            "path": str(asset.path),
+            "source_bytes_sha256": hashlib.sha256(data).hexdigest(),
+            "byte_count": len(data),
+            "encoding": asset.encoding,
+            "declared_source_sha256": asset.source_sha256,
+        }
+        try:
+>           return _decode(asset, data, trace)
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+packages/iqa/src/qwen_tmqa/asset_io.py:60: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+asset = ComparisonAsset(id='capture10', path=PosixPath('/tmp/pytest-of-root/pytest-250/test_actual_10bit_heic_keeps_m0/capture-10bit.heic'), encoding='srgb', source_sha256=None)
+data = b'\x00\x00\x00\x1cftypheix\x00\x00\x00\x00mif1heixmiaf\x00\x00\x01}meta\x00\x00\x00\x00\x00\x00\x00!hdlr\x00\x00\x00\x...x93O\xfe\x02|\x90\xedyv\xf6\xf4\xc6\x93\xff\xff\xfd\x91\x8b\xff\xf7_\xe2\x17\x97\xff\xf6Fy\xfd\x9d\xc1\xcb\xe1\x98\xb0'
+trace = {'asset_id': 'capture10', 'path': '/tmp/pytest-of-root/pytest-250/test_actual_10bit_heic_keeps_m0/capture-10bit.heic', 'source_bytes_sha256': '0d3454c2211d5d61b3d39f3f0ecc97d8b063682e30404b28b7e5f2cf46046f86', 'byte_count': 1189, ...}
+
+    def _decode(asset: ComparisonAsset, data: bytes, trace: dict[str, object]) -> LoadedComparisonAsset:
+        orientation = 1
+        warnings: list[str] = []
+        if asset.path.suffix.lower() == ".npy":
+            raw = np.load(io.BytesIO(data), allow_pickle=False)
+            decoder = "numpy_safe"
+            if not isinstance(raw, np.ndarray):
+                if hasattr(raw, "close"):
+                    raw.close()
+                raise ValueError("numpy_asset_requires_single_array")
+        else:
+            try:
+                with Image.open(io.BytesIO(data)) as image:
+                    orientation = int(image.getexif().get(274, 1))
+                    if image.info.get("icc_profile"):
+                        warnings.append("embedded_icc_not_applied_declared_encoding_used")
+            except (UnidentifiedImageError, OSError):
+                pass  # OpenCV also supports HDR formats unsupported by Pillow.
+            decoder_data = _neutralize_tiff_orientation(data)
+            raw = cv2.imdecode(np.frombuffer(decoder_data, np.uint8), cv2.IMREAD_UNCHANGED)
+            decoder = "opencv_unchanged"
+            if decoder_data != data:
+                decoder = "opencv_unchanged_tiff_orientation_neutralized"
+            if raw is None:
+>               raise ValueError("image_decode_failed")
+E               ValueError: image_decode_failed
+
+packages/iqa/src/qwen_tmqa/asset_io.py:136: ValueError
+
+The above exception was the direct cause of the following exception:
+
+tmp_path = PosixPath('/tmp/pytest-of-root/pytest-250/test_actual_10bit_heic_keeps_m0')
+
+    def test_actual_10bit_heic_keeps_more_than_256_decoded_levels(tmp_path):
+        levels = np.arange(1024, dtype=np.uint16).reshape(32, 32) * 64
+        rgb = np.repeat(levels[..., None], 3, axis=2)
+        path = tmp_path / 'capture-10bit.heic'
+        pillow_heif.from_bytes('RGB;16', (32, 32), rgb.tobytes()).save(path, quality=-1, chroma=444)
+>       loaded = load_comparison_asset(ComparisonAsset(id='capture10', path=path))
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+packages/iqa/tests/test_asset_io_heif.py:41: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+asset = ComparisonAsset(id='capture10', path=PosixPath('/tmp/pytest-of-root/pytest-250/test_actual_10bit_heic_keeps_m0/capture-10bit.heic'), encoding='srgb', source_sha256=None)
+
+    def load_comparison_asset(asset: ComparisonAsset) -> LoadedComparisonAsset:
+        data = asset.path.read_bytes()
+        trace: dict[str, object] = {
+            "asset_id": asset.id,
+            "path": str(asset.path),
+            "source_bytes_sha256": hashlib.sha256(data).hexdigest(),
+            "byte_count": len(data),
+            "encoding": asset.encoding,
+            "declared_source_sha256": asset.source_sha256,
+        }
+        try:
+            return _decode(asset, data, trace)
+        except (ValueError, OSError, EOFError, cv2.error, OverflowError) as exc:
+>           raise AssetDecodeError(str(exc), trace) from exc
+E           qwen_tmqa.asset_io.AssetDecodeError: image_decode_failed
+
+packages/iqa/src/qwen_tmqa/asset_io.py:62: AssetDecodeError
+=========================== short test summary info ============================
+FAILED packages/iqa/tests/test_asset_io_heif.py::test_actual_heic_8bit_matches_front_display_orientation[1]
+FAILED packages/iqa/tests/test_asset_io_heif.py::test_actual_heic_8bit_matches_front_display_orientation[2]
+FAILED packages/iqa/tests/test_asset_io_heif.py::test_actual_heic_8bit_matches_front_display_orientation[6]
+FAILED packages/iqa/tests/test_asset_io_heif.py::test_actual_heic_8bit_matches_front_display_orientation[8]
+FAILED packages/iqa/tests/test_asset_io_heif.py::test_actual_10bit_heic_keeps_more_than_256_decoded_levels
+5 failed in 0.60s

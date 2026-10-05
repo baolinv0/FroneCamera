@@ -1,0 +1,78 @@
+{
+  "document_id": "WORK-PROJECT-SOURCES-001",
+  "document_version": "1.3.0",
+  "schema_version": 1,
+  "status": "VERIFIED_BY_HUMAN",
+  "verified_by_type": "HUMAN",
+  "verified_by": "Human",
+  "verified_at_utc": "2026-07-17T01:39:23Z",
+  "project_source_policy": {
+    "required_source_count": 9,
+    "snapshot_semantics": "Uploaded Project Sources do not automatically synchronize with local files.",
+    "replacement_rule": "Replace every changed source in the Project and regenerate this manifest.",
+    "self_hash_rule": "This manifest does not contain its own SHA-256 because a self-hash would be recursive."
+  },
+  "sources": [
+    {
+      "path": "AGENTS.md",
+      "sha256": "f5b6f25d713d60bc048ab109b447b0458e69f4b315e1183b4d5d4b94f627acea",
+      "required": true,
+      "purpose": "Role contract and completion authority."
+    },
+    {
+      "path": "workflow/00_WORKFLOW_PROTOCOL.md",
+      "sha256": "12b4379dba33b16ebdf2384dcd0eb4832ffa773224bd4760880be1a5eb5f8ba5",
+      "required": true,
+      "purpose": "Workflow state machine and review loop."
+    },
+    {
+      "path": "workflow/01_SPEC_BASELINE.json",
+      "sha256": "783654a133b68eeb87909dbe392c3ab2cace2af92bb841588a88721a217139ac",
+      "required": true,
+      "purpose": "Specification version, freeze state, approval, and source bindings."
+    },
+    {
+      "path": "workflow/02_ORIGINAL_REQUIREMENTS.md",
+      "sha256": "8fb87f9b510ad059cd6bef3bcdc98f95a960f1755d58aa393f03ec37547c671c",
+      "required": true,
+      "purpose": "Original goal, scope, constraints, invariants, and deliverables."
+    },
+    {
+      "path": "workflow/03_ACCEPTANCE_MATRIX.csv",
+      "sha256": "5beb108d9a9712d78c9b2221d527b25979ae5dec64ccabc9d351aee23d7f624a",
+      "required": true,
+      "purpose": "Requirement-to-verification and threshold mapping."
+    },
+    {
+      "path": "workflow/04_VERIFICATION_PLAN.json",
+      "sha256": "7674a876557153886857c5a03bc2587c2fd3f888762b580b40b01ce21a0fbd81",
+      "required": true,
+      "purpose": "Required executable and non-command checks."
+    },
+    {
+      "path": "workflow/05_CHANGE_REQUESTS.md",
+      "sha256": "df50094fde6a6e4f29ae9d5612540967418881f5f7e0c85aa4c23d871f586eca",
+      "required": true,
+      "purpose": "Specification-change audit and rebaseline rules."
+    },
+    {
+      "path": "workflow/06_RISK_ACCEPTANCE.json",
+      "sha256": "00325c224799dff32cb4744071e933f7e03fa958f8f4666fdb40c84d2b8680b3",
+      "required": true,
+      "purpose": "Human-only residual-risk decisions."
+    },
+    {
+      "path": "workflow/WORK_PROJECT_SOURCES.json",
+      "sha256": "SELF_NOT_HASHED",
+      "required": true,
+      "purpose": "Project Source inventory, versions, and upload verification."
+    }
+  ],
+  "human_verification_checklist": [
+    "Verified by the human project owner.",
+    "The frozen TMQA specification version is 0.2.0.",
+    "01_SPEC_BASELINE.json remains FROZEN.",
+    "The requirements, acceptance matrix, verification plan, and source manifest versions and hashes were accepted for use as the Project Sources baseline.",
+    "Any later source replacement requires refreshed hashes and renewed human verification."
+  ]
+}

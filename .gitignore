@@ -19,3 +19,14 @@ smoke.db
 
 *.tsbuildinfo
 web/package-lock.json
+
+# Generated local verification/build artifacts
+packages/iqa/dist/
+packages/iqa/build/
+packages/iqa/runs/
+packages/iqa/.verification/
+build/
+dist/
+evidence/runtime/
+!evidence/build/
+!evidence/build/**

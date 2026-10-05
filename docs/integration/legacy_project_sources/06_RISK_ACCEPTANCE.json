@@ -1,0 +1,25 @@
+{
+  "document_id": "WORK-RISK-ACCEPTANCE-001",
+  "document_version": "1.0.0",
+  "schema_version": 1,
+  "policy": {
+    "P0": "Cannot be accepted. Must be fixed or task fails.",
+    "P1": "Cannot be accepted. Must be fixed or task fails.",
+    "P2": "May be accepted only by a human owner with explicit rationale and scope.",
+    "P3": "Advisory. Must be recorded but does not block completion unless promoted."
+  },
+  "accepted_findings": [],
+  "entry_template": {
+    "finding_id": "CRIT-000",
+    "severity": "P2",
+    "decision": "ACCEPT",
+    "accepted_scope": "",
+    "rationale": "",
+    "consequence": "",
+    "mitigation": "",
+    "expires_at_utc": "",
+    "approved_by_type": "HUMAN",
+    "approved_by": "",
+    "approved_at_utc": ""
+  }
+}

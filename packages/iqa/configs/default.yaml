@@ -1,0 +1,79 @@
+dataset:
+  baseline_level: a_000
+  expected_levels:
+    - a_m100
+    - a_m075
+    - a_m050
+    - a_m025
+    - a_000
+    - a_p025
+    - a_p050
+    - a_p075
+    - a_p100
+  strict_complete: true
+  recursive: true
+  generator: demo_generator
+judges:
+  - id: minicpm-prescreener
+    role: prescreener
+    adapter: mock
+    model: MiniCPM-V-4.5
+    version: synthetic-demo-v1
+    synthetic: true
+    prompt_version: "3.3"
+    bias_profile: fast
+  - id: qwen-primary
+    role: primary
+    adapter: mock
+    model: Qwen3-VL-8B-Instruct
+    version: synthetic-demo-v1
+    synthetic: true
+    prompt_version: "3.3"
+    bias_profile: aesthetic
+  - id: internvl-arbiter
+    role: arbiter
+    adapter: mock
+    model: InternVL3.5-38B
+    version: synthetic-demo-v1
+    synthetic: true
+    prompt_version: "3.3"
+    bias_profile: fidelity
+  - id: ovis-local
+    role: local_inspector
+    adapter: mock
+    model: Ovis2.6-30B-A3B
+    version: synthetic-demo-v1
+    synthetic: true
+    prompt_version: "3.3"
+    bias_profile: local
+decision_policy:
+  version: tmqa.decision.v1
+  objective_fatal_clipping_ratio: 0.45
+  objective_fatal_min_edge_similarity: 0.45
+  regenerate_score_threshold: 0.60
+  keep_score_threshold: 0.75
+  low_tail_score_threshold: 0.70
+  tone_stage_pass_threshold: 0.65
+  fidelity_stage_pass_threshold: 0.75
+  control_stage_pass_threshold: 0.75
+  edge_risk_reference: 0.75
+  clipping_risk_multiplier: 1.50
+  uncertainty_base: 0.15
+  uncertainty_gap_weight: 0.80
+  uncertainty_control_weight: 0.20
+  uncertainty_unavailable_weight: 0.35
+review:
+  version: tmqa.review.v1
+  max_queue_size: 200
+  disagreement_threshold: 0.15
+  tail_percentile: 0.10
+  high_risk_threshold: 0.60
+  random_audit_fraction: 0.0
+calibration:
+  version: tmqa.calibration.v1
+  minimum_real_sample_count: 20
+visualization:
+  title: Qwen-TMQA Visual Review
+  include_raw_response: true
+  include_prompt_diff: true
+  default_blind_review: true

@@ -1,0 +1,66 @@
+{
+  "models": [
+    {
+      "model_id": "internvl-arbiter",
+      "sample_count": 4,
+      "overall_mae": 0.029111957834813296,
+      "decision_agreement": 1.0,
+      "dimension_mae": {
+        "control": 0.0,
+        "fidelity": 0.035495120597683755,
+        "overall": 0.029111957834813296,
+        "tone": 0.1695870535714286
+      },
+      "fusion_weight": 0.3505363122433217
+    },
+    {
+      "model_id": "minicpm-prescreener",
+      "sample_count": 4,
+      "overall_mae": 0.05421402405382031,
+      "decision_agreement": 1.0,
+      "dimension_mae": {
+        "control": 0.0,
+        "fidelity": 0.03973320660285748,
+        "overall": 0.05421402405382031,
+        "tone": 0.1695870535714286
+      },
+      "fusion_weight": 0.191171261916229
+    },
+    {
+      "model_id": "ovis-local",
+      "sample_count": 4,
+      "overall_mae": 0.24220128467141067,
+      "decision_agreement": 0.75,
+      "dimension_mae": {
+        "control": 0.0,
+        "fidelity": 0.03269601147182313,
+        "overall": 0.24220128467141067,
+        "tone": 0.44002999441964286
+      },
+      "fusion_weight": 0.04340164020146179
+    },
+    {
+      "model_id": "qwen-primary",
+      "sample_count": 4,
+      "overall_mae": 0.024441236631913194,
+      "decision_agreement": 0.75,
+      "dimension_mae": {
+        "control": 0.0,
+        "fidelity": 0.0597332066028575,
+        "overall": 0.024441236631913194,
+        "tone": 0.03643275669642859
+      },
+      "fusion_weight": 0.41489078563898746
+    }
+  ],
+  "synthetic_reviews": true,
+  "review_count": 4,
+  "pairwise_mean_gap": {
+    "internvl-arbiter__minicpm-prescreener": 0.06738361119570935,
+    "internvl-arbiter__ovis-local": 0.19480606350448992,
+    "internvl-arbiter__qwen-primary": 0.0315061568027404,
+    "minicpm-prescreener__ovis-local": 0.12972539924762086,
+    "minicpm-prescreener__qwen-primary": 0.0481617549170563,
+    "ovis-local__qwen-primary": 0.1755842072258369
+  }
+}

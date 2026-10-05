@@ -1,0 +1,192 @@
+FFFF                                                                     [100%]
+=================================== FAILURES ===================================
+_ test_loader_resource_guard_becomes_byte_traced_invalid_without_disabling_pillow_limit _
+
+tmp_path = PosixPath('/tmp/pytest-of-root/pytest-299/test_loader_resource_guard_bec0')
+
+    def test_loader_resource_guard_becomes_byte_traced_invalid_without_disabling_pillow_limit(tmp_path):
+        valid, bad = files(tmp_path)
+        threshold = Image.MAX_IMAGE_PIXELS
+        assert threshold is not None and threshold > 0
+        with pytest.raises(Image.DecompressionBombError):
+            Image.open(bad)
+        with pytest.raises(AssetDecodeError) as exc:
+>           load_comparison_asset(ComparisonAsset(id='oversized', path=bad))
+
+packages/iqa/tests/test_asset_io_resource_guard.py:52: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+packages/iqa/src/qwen_tmqa/asset_io.py:61: in load_comparison_asset
+    return _decode(asset, data, trace)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+packages/iqa/src/qwen_tmqa/asset_io.py:149: in _decode
+    with Image.open(io.BytesIO(data)) as image:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/site-packages/PIL/Image.py:3689: in open
+    im = _open_core(fp, filename, prefix, formats)
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/site-packages/PIL/Image.py:3678: in _open_core
+    _decompression_bomb_check(im.size)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+size = (20000, 20000)
+
+    def _decompression_bomb_check(size: tuple[int, int]) -> None:
+        if MAX_IMAGE_PIXELS is None:
+            return
+    
+        pixels = max(1, size[0]) * max(1, size[1])
+    
+        if pixels > 2 * MAX_IMAGE_PIXELS:
+            msg = (
+                f"Image size ({pixels} pixels) exceeds limit of {2 * MAX_IMAGE_PIXELS} "
+                "pixels, could be decompression bomb DOS attack."
+            )
+>           raise DecompressionBombError(msg)
+E           PIL.Image.DecompressionBombError: Image size (400000000 pixels) exceeds limit of 178956970 pixels, could be decompression bomb DOS attack.
+
+/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/site-packages/PIL/Image.py:3575: DecompressionBombError
+__ test_guarded_candidate_returns_finite_rejection_and_valid_sibling_survives __
+
+tmp_path = PosixPath('/tmp/pytest-of-root/pytest-299/test_guarded_candidate_returns0')
+
+    def test_guarded_candidate_returns_finite_rejection_and_valid_sibling_survives(tmp_path):
+        valid, bad = files(tmp_path)
+>       result = evaluate_comparison(request(valid, bad))
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+packages/iqa/tests/test_asset_io_resource_guard.py:64: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+packages/iqa/src/qwen_tmqa/comparison.py:285: in evaluate_comparison
+    loaded[asset.id] = load_comparison_asset(asset)
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+packages/iqa/src/qwen_tmqa/asset_io.py:61: in load_comparison_asset
+    return _decode(asset, data, trace)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+packages/iqa/src/qwen_tmqa/asset_io.py:149: in _decode
+    with Image.open(io.BytesIO(data)) as image:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/site-packages/PIL/Image.py:3689: in open
+    im = _open_core(fp, filename, prefix, formats)
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/site-packages/PIL/Image.py:3678: in _open_core
+    _decompression_bomb_check(im.size)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+size = (20000, 20000)
+
+    def _decompression_bomb_check(size: tuple[int, int]) -> None:
+        if MAX_IMAGE_PIXELS is None:
+            return
+    
+        pixels = max(1, size[0]) * max(1, size[1])
+    
+        if pixels > 2 * MAX_IMAGE_PIXELS:
+            msg = (
+                f"Image size ({pixels} pixels) exceeds limit of {2 * MAX_IMAGE_PIXELS} "
+                "pixels, could be decompression bomb DOS attack."
+            )
+>           raise DecompressionBombError(msg)
+E           PIL.Image.DecompressionBombError: Image size (400000000 pixels) exceeds limit of 178956970 pixels, could be decompression bomb DOS attack.
+
+/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/site-packages/PIL/Image.py:3575: DecompressionBombError
+_ test_installed_cli_writes_reject_json_csv_and_valid_sibling_without_traceback _
+
+tmp_path = PosixPath('/tmp/pytest-of-root/pytest-299/test_installed_cli_writes_reje0')
+
+    def test_installed_cli_writes_reject_json_csv_and_valid_sibling_without_traceback(tmp_path):
+        valid, bad = files(tmp_path)
+        manifest, output = tmp_path / 'manifest.json', tmp_path / 'result.json'
+        manifest.write_text(request(valid, bad).model_dump_json())
+        env = dict(os.environ)
+        env['PATH'] = str(Path(sys.executable).parent) + os.pathsep + env.get('PATH', '')
+        run = subprocess.run(['iqa-compare', 'evaluate', '--manifest', str(manifest), '--output', str(output)],
+                             capture_output=True, text=True, env=env, check=False)
+>       assert run.returncode == 0, run.stderr
+E       AssertionError: Traceback (most recent call last):
+E           File "/workspace/scratch/617f8bd555c4/frone-dev-env/bin/iqa-compare", line 8, in <module>
+E             sys.exit(main())
+E                      ^^^^^^
+E           File "/workspace/scratch/617f8bd555c4/FroneCamera-implementation/packages/iqa/src/qwen_tmqa/comparison_cli.py", line 224, in main
+E             result = evaluate_comparison(_manifest_request(args.manifest))
+E                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E           File "/workspace/scratch/617f8bd555c4/FroneCamera-implementation/packages/iqa/src/qwen_tmqa/comparison.py", line 285, in evaluate_comparison
+E             loaded[asset.id] = load_comparison_asset(asset)
+E                                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E           File "/workspace/scratch/617f8bd555c4/FroneCamera-implementation/packages/iqa/src/qwen_tmqa/asset_io.py", line 61, in load_comparison_asset
+E             return _decode(asset, data, trace)
+E                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E           File "/workspace/scratch/617f8bd555c4/FroneCamera-implementation/packages/iqa/src/qwen_tmqa/asset_io.py", line 149, in _decode
+E             with Image.open(io.BytesIO(data)) as image:
+E                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E           File "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/site-packages/PIL/Image.py", line 3689, in open
+E             im = _open_core(fp, filename, prefix, formats)
+E                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E           File "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/site-packages/PIL/Image.py", line 3678, in _open_core
+E             _decompression_bomb_check(im.size)
+E           File "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/site-packages/PIL/Image.py", line 3575, in _decompression_bomb_check
+E             raise DecompressionBombError(msg)
+E         PIL.Image.DecompressionBombError: Image size (400000000 pixels) exceeds limit of 178956970 pixels, could be decompression bomb DOS attack.
+E         
+E       assert 1 == 0
+E        +  where 1 = CompletedProcess(args=['iqa-compare', 'evaluate', '--manifest', '/tmp/pytest-of-root/pytest-299/test_installed_cli_wri...BombError: Image size (400000000 pixels) exceeds limit of 178956970 pixels, could be decompression bomb DOS attack.\n').returncode
+
+packages/iqa/tests/test_asset_io_resource_guard.py:83: AssertionError
+____ test_version_folder_retains_other_scene_after_resource_guard_rejection ____
+
+tmp_path = PosixPath('/tmp/pytest-of-root/pytest-299/test_version_folder_retains_ot0')
+
+    def test_version_folder_retains_other_scene_after_resource_guard_rejection(tmp_path):
+        valid, bad = files(tmp_path)
+        roots = [tmp_path / name for name in ('baseline', 'candidate', 'source')]
+        for root in roots:
+            root.mkdir()
+            (root / 'good.png').write_bytes(valid.read_bytes())
+            (root / 'bad.png').write_bytes(valid.read_bytes())
+        (roots[1] / 'bad.png').write_bytes(bad.read_bytes())
+>       batch = compare_version_folders(roots[0], [roots[1]], roots[2])
+                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+packages/iqa/tests/test_asset_io_resource_guard.py:103: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+packages/iqa/src/qwen_tmqa/comparison_cli.py:160: in compare_version_folders
+    results.append(evaluate_comparison(request))
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+packages/iqa/src/qwen_tmqa/comparison.py:285: in evaluate_comparison
+    loaded[asset.id] = load_comparison_asset(asset)
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+packages/iqa/src/qwen_tmqa/asset_io.py:61: in load_comparison_asset
+    return _decode(asset, data, trace)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+packages/iqa/src/qwen_tmqa/asset_io.py:149: in _decode
+    with Image.open(io.BytesIO(data)) as image:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/site-packages/PIL/Image.py:3689: in open
+    im = _open_core(fp, filename, prefix, formats)
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/site-packages/PIL/Image.py:3678: in _open_core
+    _decompression_bomb_check(im.size)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+size = (20000, 20000)
+
+    def _decompression_bomb_check(size: tuple[int, int]) -> None:
+        if MAX_IMAGE_PIXELS is None:
+            return
+    
+        pixels = max(1, size[0]) * max(1, size[1])
+    
+        if pixels > 2 * MAX_IMAGE_PIXELS:
+            msg = (
+                f"Image size ({pixels} pixels) exceeds limit of {2 * MAX_IMAGE_PIXELS} "
+                "pixels, could be decompression bomb DOS attack."
+            )
+>           raise DecompressionBombError(msg)
+E           PIL.Image.DecompressionBombError: Image size (400000000 pixels) exceeds limit of 178956970 pixels, could be decompression bomb DOS attack.
+
+/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/site-packages/PIL/Image.py:3575: DecompressionBombError
+=========================== short test summary info ============================
+FAILED packages/iqa/tests/test_asset_io_resource_guard.py::test_loader_resource_guard_becomes_byte_traced_invalid_without_disabling_pillow_limit
+FAILED packages/iqa/tests/test_asset_io_resource_guard.py::test_guarded_candidate_returns_finite_rejection_and_valid_sibling_survives
+FAILED packages/iqa/tests/test_asset_io_resource_guard.py::test_installed_cli_writes_reject_json_csv_and_valid_sibling_without_traceback
+FAILED packages/iqa/tests/test_asset_io_resource_guard.py::test_version_folder_retains_other_scene_after_resource_guard_rejection
+4 failed in 1.05s

@@ -1,0 +1,1669 @@
+{
+  "assets": [
+    {
+      "dimensions": {
+        "artifact_texture_control": {
+          "absolute_quality_score": null,
+          "evidence_refs": [
+            "roi:face-one",
+            "roi:face-two"
+          ],
+          "facts": {
+            "face-one.blue_mean": 0.20611229541956533,
+            "face-one.contrast_std": 0.0884279733634884,
+            "face-one.edge_mean": 0.3398908328969388,
+            "face-one.ev_mean": -2.306738336082053,
+            "face-one.green_mean": 0.19580399895994935,
+            "face-one.highlight_fraction": 0.0,
+            "face-one.mean_luminance": 0.20211687213910629,
+            "face-one.p05_luminance": 0.0894606696952404,
+            "face-one.p50_luminance": 0.18124140449105375,
+            "face-one.p95_luminance": 0.3748693254762243,
+            "face-one.pixel_count": 256,
+            "face-one.red_mean": 0.2219969160567163,
+            "face-one.shadow_fraction": 0.0,
+            "face-two.blue_mean": 0.20913182933751595,
+            "face-two.contrast_std": 0.0881429963235766,
+            "face-two.edge_mean": 0.3733553142979383,
+            "face-two.ev_mean": -2.2777758875867704,
+            "face-two.green_mean": 0.20544295493605344,
+            "face-two.highlight_fraction": 0.0,
+            "face-two.mean_luminance": 0.206215418763083,
+            "face-two.p05_luminance": 0.08127941952194234,
+            "face-two.p50_luminance": 0.194046693446561,
+            "face-two.p95_luminance": 0.3648693828396989,
+            "face-two.pixel_count": 256,
+            "face-two.red_mean": 0.20782360919402137,
+            "face-two.shadow_fraction": 0.0
+          },
+          "missing_evidence": [
+            "valid_edge_region"
+          ],
+          "state": "unobservable",
+          "uncertainty": [
+            "uncalibrated_photometric_proxy",
+            "no_reference_chart_or_human_preference"
+          ]
+        },
+        "face_background_relation": {
+          "absolute_quality_score": null,
+          "evidence_refs": [
+            "roi:face-one",
+            "roi:face-two"
+          ],
+          "facts": {
+            "face-one.blue_mean": 0.20611229541956533,
+            "face-one.contrast_std": 0.0884279733634884,
+            "face-one.edge_mean": 0.3398908328969388,
+            "face-one.ev_mean": -2.306738336082053,
+            "face-one.green_mean": 0.19580399895994935,
+            "face-one.highlight_fraction": 0.0,
+            "face-one.mean_luminance": 0.20211687213910629,
+            "face-one.p05_luminance": 0.0894606696952404,
+            "face-one.p50_luminance": 0.18124140449105375,
+            "face-one.p95_luminance": 0.3748693254762243,
+            "face-one.pixel_count": 256,
+            "face-one.red_mean": 0.2219969160567163,
+            "face-one.shadow_fraction": 0.0,
+            "face-two.blue_mean": 0.20913182933751595,
+            "face-two.contrast_std": 0.0881429963235766,
+            "face-two.edge_mean": 0.3733553142979383,
+            "face-two.ev_mean": -2.2777758875867704,
+            "face-two.green_mean": 0.20544295493605344,
+            "face-two.highlight_fraction": 0.0,
+            "face-two.mean_luminance": 0.206215418763083,
+            "face-two.p05_luminance": 0.08127941952194234,
+            "face-two.p50_luminance": 0.194046693446561,
+            "face-two.p95_luminance": 0.3648693828396989,
+            "face-two.pixel_count": 256,
+            "face-two.red_mean": 0.20782360919402137,
+            "face-two.shadow_fraction": 0.0
+          },
+          "missing_evidence": [
+            "valid_face_ring_region",
+            "valid_background_region"
+          ],
+          "state": "unobservable",
+          "uncertainty": [
+            "uncalibrated_photometric_proxy",
+            "no_reference_chart_or_human_preference"
+          ]
+        },
+        "face_exposure_readability": {
+          "absolute_quality_score": null,
+          "evidence_refs": [
+            "roi:face-one",
+            "roi:face-two"
+          ],
+          "facts": {
+            "face-one.blue_mean": 0.20611229541956533,
+            "face-one.contrast_std": 0.0884279733634884,
+            "face-one.edge_mean": 0.3398908328969388,
+            "face-one.ev_mean": -2.306738336082053,
+            "face-one.green_mean": 0.19580399895994935,
+            "face-one.highlight_fraction": 0.0,
+            "face-one.mean_luminance": 0.20211687213910629,
+            "face-one.p05_luminance": 0.0894606696952404,
+            "face-one.p50_luminance": 0.18124140449105375,
+            "face-one.p95_luminance": 0.3748693254762243,
+            "face-one.pixel_count": 256,
+            "face-one.red_mean": 0.2219969160567163,
+            "face-one.shadow_fraction": 0.0,
+            "face-two.blue_mean": 0.20913182933751595,
+            "face-two.contrast_std": 0.0881429963235766,
+            "face-two.edge_mean": 0.3733553142979383,
+            "face-two.ev_mean": -2.2777758875867704,
+            "face-two.green_mean": 0.20544295493605344,
+            "face-two.highlight_fraction": 0.0,
+            "face-two.mean_luminance": 0.206215418763083,
+            "face-two.p05_luminance": 0.08127941952194234,
+            "face-two.p50_luminance": 0.194046693446561,
+            "face-two.p95_luminance": 0.3648693828396989,
+            "face-two.pixel_count": 256,
+            "face-two.red_mean": 0.20782360919402137,
+            "face-two.shadow_fraction": 0.0
+          },
+          "missing_evidence": [],
+          "state": "measured_proxy",
+          "uncertainty": [
+            "uncalibrated_photometric_proxy",
+            "no_reference_chart_or_human_preference"
+          ]
+        },
+        "highlight_integrity": {
+          "absolute_quality_score": null,
+          "evidence_refs": [],
+          "facts": {},
+          "missing_evidence": [
+            "valid_highlight_region"
+          ],
+          "state": "unobservable",
+          "uncertainty": [
+            "uncalibrated_photometric_proxy",
+            "no_reference_chart_or_human_preference"
+          ]
+        },
+        "lighting_causality": {
+          "absolute_quality_score": null,
+          "evidence_refs": [],
+          "facts": {},
+          "missing_evidence": [
+            "valid_face_highlight_region",
+            "valid_face_shadow_region"
+          ],
+          "state": "unobservable",
+          "uncertainty": [
+            "uncalibrated_photometric_proxy",
+            "no_reference_chart_or_human_preference",
+            "internal_contrast_does_not_establish_physical_lighting_causation"
+          ]
+        },
+        "local_face_lift_naturalness": {
+          "absolute_quality_score": null,
+          "evidence_refs": [
+            "roi:face-one",
+            "roi:face-two"
+          ],
+          "facts": {
+            "face-one.blue_mean": 0.20611229541956533,
+            "face-one.contrast_std": 0.0884279733634884,
+            "face-one.edge_mean": 0.3398908328969388,
+            "face-one.ev_mean": -2.306738336082053,
+            "face-one.green_mean": 0.19580399895994935,
+            "face-one.highlight_fraction": 0.0,
+            "face-one.mean_luminance": 0.20211687213910629,
+            "face-one.p05_luminance": 0.0894606696952404,
+            "face-one.p50_luminance": 0.18124140449105375,
+            "face-one.p95_luminance": 0.3748693254762243,
+            "face-one.pixel_count": 256,
+            "face-one.red_mean": 0.2219969160567163,
+            "face-one.shadow_fraction": 0.0,
+            "face-two.blue_mean": 0.20913182933751595,
+            "face-two.contrast_std": 0.0881429963235766,
+            "face-two.edge_mean": 0.3733553142979383,
+            "face-two.ev_mean": -2.2777758875867704,
+            "face-two.green_mean": 0.20544295493605344,
+            "face-two.highlight_fraction": 0.0,
+            "face-two.mean_luminance": 0.206215418763083,
+            "face-two.p05_luminance": 0.08127941952194234,
+            "face-two.p50_luminance": 0.194046693446561,
+            "face-two.p95_luminance": 0.3648693828396989,
+            "face-two.pixel_count": 256,
+            "face-two.red_mean": 0.20782360919402137,
+            "face-two.shadow_fraction": 0.0
+          },
+          "missing_evidence": [
+            "valid_face_ring_region",
+            "valid_background_region"
+          ],
+          "state": "unobservable",
+          "uncertainty": [
+            "uncalibrated_photometric_proxy",
+            "no_reference_chart_or_human_preference",
+            "boundary_contrast_is_not_human_naturalness"
+          ]
+        },
+        "multi_face_consistency": {
+          "absolute_quality_score": null,
+          "evidence_refs": [
+            "roi:face-one",
+            "roi:face-two"
+          ],
+          "facts": {
+            "face_luminance_spread": 0.004098546623976712,
+            "person_count": 2
+          },
+          "missing_evidence": [],
+          "state": "measured_proxy",
+          "uncertainty": [
+            "uncalibrated_photometric_proxy",
+            "no_reference_chart_or_human_preference",
+            "different_skin_reflectance_and_lighting_confound_consistency"
+          ]
+        },
+        "scene_adaptability": {
+          "absolute_quality_score": null,
+          "evidence_refs": [],
+          "facts": {},
+          "missing_evidence": [
+            "multiple_comparable_scenes"
+          ],
+          "state": "not_applicable",
+          "uncertainty": []
+        },
+        "shadow_black_rendering": {
+          "absolute_quality_score": null,
+          "evidence_refs": [],
+          "facts": {},
+          "missing_evidence": [
+            "valid_background_region",
+            "valid_shadow_region"
+          ],
+          "state": "unobservable",
+          "uncertainty": [
+            "uncalibrated_photometric_proxy",
+            "no_reference_chart_or_human_preference"
+          ]
+        },
+        "skin_awb": {
+          "absolute_quality_score": null,
+          "evidence_refs": [],
+          "facts": {},
+          "missing_evidence": [
+            "valid_skin_region",
+            "illumination_or_color_reference"
+          ],
+          "state": "unobservable",
+          "uncertainty": [
+            "uncalibrated_photometric_proxy",
+            "no_reference_chart_or_human_preference",
+            "skin_rgb_is_not_white_balance_accuracy"
+          ]
+        }
+      },
+      "id": "B",
+      "objective": {
+        "blue_mean": 0.20625379588251688,
+        "contrast_std": 0.08788962268633992,
+        "edge_mean": 0.37699258665428437,
+        "ev_mean": -2.275930509959811,
+        "green_mean": 0.20597055411798937,
+        "highlight_fraction": 0.0,
+        "mean_luminance": 0.20647936144977197,
+        "p05_luminance": 0.08584579909950965,
+        "p50_luminance": 0.19401873865259522,
+        "p95_luminance": 0.3614430635223522,
+        "pixel_count": 4096,
+        "red_mean": 0.20826762503230595,
+        "shadow_fraction": 0.0
+      },
+      "persons": {
+        "one": {
+          "face-one": {
+            "blue_mean": 0.20611229541956533,
+            "contrast_std": 0.0884279733634884,
+            "edge_mean": 0.3398908328969388,
+            "ev_mean": -2.306738336082053,
+            "green_mean": 0.19580399895994935,
+            "highlight_fraction": 0.0,
+            "mean_luminance": 0.20211687213910629,
+            "p05_luminance": 0.0894606696952404,
+            "p50_luminance": 0.18124140449105375,
+            "p95_luminance": 0.3748693254762243,
+            "pixel_count": 256,
+            "red_mean": 0.2219969160567163,
+            "shadow_fraction": 0.0
+          }
+        },
+        "two": {
+          "face-two": {
+            "blue_mean": 0.20913182933751595,
+            "contrast_std": 0.0881429963235766,
+            "edge_mean": 0.3733553142979383,
+            "ev_mean": -2.2777758875867704,
+            "green_mean": 0.20544295493605344,
+            "highlight_fraction": 0.0,
+            "mean_luminance": 0.206215418763083,
+            "p05_luminance": 0.08127941952194234,
+            "p50_luminance": 0.194046693446561,
+            "p95_luminance": 0.3648693828396989,
+            "pixel_count": 256,
+            "red_mean": 0.20782360919402137,
+            "shadow_fraction": 0.0
+          }
+        }
+      },
+      "reasons": [],
+      "rois": {
+        "face-one": {
+          "bbox": [
+            8,
+            8,
+            16,
+            16
+          ],
+          "id": "face-one",
+          "kind": "face",
+          "objective": {
+            "blue_mean": 0.20611229541956533,
+            "contrast_std": 0.0884279733634884,
+            "edge_mean": 0.3398908328969388,
+            "ev_mean": -2.306738336082053,
+            "green_mean": 0.19580399895994935,
+            "highlight_fraction": 0.0,
+            "mean_luminance": 0.20211687213910629,
+            "p05_luminance": 0.0894606696952404,
+            "p50_luminance": 0.18124140449105375,
+            "p95_luminance": 0.3748693254762243,
+            "pixel_count": 256,
+            "red_mean": 0.2219969160567163,
+            "shadow_fraction": 0.0
+          },
+          "person_id": "one",
+          "reasons": [],
+          "state": "measured_proxy"
+        },
+        "face-two": {
+          "bbox": [
+            40,
+            40,
+            16,
+            16
+          ],
+          "id": "face-two",
+          "kind": "face",
+          "objective": {
+            "blue_mean": 0.20913182933751595,
+            "contrast_std": 0.0881429963235766,
+            "edge_mean": 0.3733553142979383,
+            "ev_mean": -2.2777758875867704,
+            "green_mean": 0.20544295493605344,
+            "highlight_fraction": 0.0,
+            "mean_luminance": 0.206215418763083,
+            "p05_luminance": 0.08127941952194234,
+            "p50_luminance": 0.194046693446561,
+            "p95_luminance": 0.3648693828396989,
+            "pixel_count": 256,
+            "red_mean": 0.20782360919402137,
+            "shadow_fraction": 0.0
+          },
+          "person_id": "two",
+          "reasons": [],
+          "state": "measured_proxy"
+        }
+      },
+      "state": "valid",
+      "trace": {
+        "asset_id": "B",
+        "bit_depth": 8,
+        "byte_count": 11908,
+        "declared_source_sha256": "5605e818472b94d1d06efb727b0e002cbfd28bcbba71b8c7a5546368ed65ace6",
+        "decoded_pixels_sha256": "1474112c80443e26f6ff684d1bb7b6e657b8f278e4b958e14cbfc867b6e60d67",
+        "decoder": "opencv_unchanged",
+        "dtype": "uint8",
+        "encoding": "srgb",
+        "exif_orientation": 1,
+        "normalization_denominator": 255.0,
+        "orientation_convention": "exif_transposed",
+        "oriented_shape": [
+          64,
+          64,
+          3
+        ],
+        "original_shape": [
+          64,
+          64,
+          3
+        ],
+        "path": "/workspace/scratch/617f8bd555c4/FroneCamera-implementation/evidence/build/task-1-example/baseline.png",
+        "source_bytes_sha256": "8327b144e28963e2ca7e65a355c45655485a20b0e1fc7ddc0f6238715fd59e07",
+        "warnings": []
+      }
+    },
+    {
+      "dimensions": {
+        "artifact_texture_control": {
+          "absolute_quality_score": null,
+          "evidence_refs": [
+            "roi:face-one",
+            "roi:face-two"
+          ],
+          "facts": {
+            "face-one.blue_mean": 0.22654164105549537,
+            "face-one.contrast_std": 0.09369674508105678,
+            "face-one.edge_mean": 0.3601401594926896,
+            "face-one.ev_mean": -2.1693492585169203,
+            "face-one.green_mean": 0.21559096753772525,
+            "face-one.highlight_fraction": 0.0,
+            "face-one.mean_luminance": 0.22231092316140424,
+            "face-one.p05_luminance": 0.10240943613665204,
+            "face-one.p50_luminance": 0.2009241737440346,
+            "face-one.p95_luminance": 0.4045171730574153,
+            "face-one.pixel_count": 256,
+            "face-one.red_mean": 0.24348051126160106,
+            "face-one.shadow_fraction": 0.0,
+            "face-two.blue_mean": 0.20913182933751595,
+            "face-two.contrast_std": 0.0881429963235766,
+            "face-two.edge_mean": 0.3733553142979383,
+            "face-two.ev_mean": -2.2777758875867704,
+            "face-two.green_mean": 0.20544295493605344,
+            "face-two.highlight_fraction": 0.0,
+            "face-two.mean_luminance": 0.206215418763083,
+            "face-two.p05_luminance": 0.08127941952194234,
+            "face-two.p50_luminance": 0.194046693446561,
+            "face-two.p95_luminance": 0.3648693828396989,
+            "face-two.pixel_count": 256,
+            "face-two.red_mean": 0.20782360919402137,
+            "face-two.shadow_fraction": 0.0
+          },
+          "missing_evidence": [
+            "valid_edge_region"
+          ],
+          "state": "unobservable",
+          "uncertainty": [
+            "uncalibrated_photometric_proxy",
+            "no_reference_chart_or_human_preference"
+          ]
+        },
+        "face_background_relation": {
+          "absolute_quality_score": null,
+          "evidence_refs": [
+            "roi:face-one",
+            "roi:face-two"
+          ],
+          "facts": {
+            "face-one.blue_mean": 0.22654164105549537,
+            "face-one.contrast_std": 0.09369674508105678,
+            "face-one.edge_mean": 0.3601401594926896,
+            "face-one.ev_mean": -2.1693492585169203,
+            "face-one.green_mean": 0.21559096753772525,
+            "face-one.highlight_fraction": 0.0,
+            "face-one.mean_luminance": 0.22231092316140424,
+            "face-one.p05_luminance": 0.10240943613665204,
+            "face-one.p50_luminance": 0.2009241737440346,
+            "face-one.p95_luminance": 0.4045171730574153,
+            "face-one.pixel_count": 256,
+            "face-one.red_mean": 0.24348051126160106,
+            "face-one.shadow_fraction": 0.0,
+            "face-two.blue_mean": 0.20913182933751595,
+            "face-two.contrast_std": 0.0881429963235766,
+            "face-two.edge_mean": 0.3733553142979383,
+            "face-two.ev_mean": -2.2777758875867704,
+            "face-two.green_mean": 0.20544295493605344,
+            "face-two.highlight_fraction": 0.0,
+            "face-two.mean_luminance": 0.206215418763083,
+            "face-two.p05_luminance": 0.08127941952194234,
+            "face-two.p50_luminance": 0.194046693446561,
+            "face-two.p95_luminance": 0.3648693828396989,
+            "face-two.pixel_count": 256,
+            "face-two.red_mean": 0.20782360919402137,
+            "face-two.shadow_fraction": 0.0
+          },
+          "missing_evidence": [
+            "valid_face_ring_region",
+            "valid_background_region"
+          ],
+          "state": "unobservable",
+          "uncertainty": [
+            "uncalibrated_photometric_proxy",
+            "no_reference_chart_or_human_preference"
+          ]
+        },
+        "face_exposure_readability": {
+          "absolute_quality_score": null,
+          "evidence_refs": [
+            "roi:face-one",
+            "roi:face-two"
+          ],
+          "facts": {
+            "face-one.blue_mean": 0.22654164105549537,
+            "face-one.contrast_std": 0.09369674508105678,
+            "face-one.edge_mean": 0.3601401594926896,
+            "face-one.ev_mean": -2.1693492585169203,
+            "face-one.green_mean": 0.21559096753772525,
+            "face-one.highlight_fraction": 0.0,
+            "face-one.mean_luminance": 0.22231092316140424,
+            "face-one.p05_luminance": 0.10240943613665204,
+            "face-one.p50_luminance": 0.2009241737440346,
+            "face-one.p95_luminance": 0.4045171730574153,
+            "face-one.pixel_count": 256,
+            "face-one.red_mean": 0.24348051126160106,
+            "face-one.shadow_fraction": 0.0,
+            "face-two.blue_mean": 0.20913182933751595,
+            "face-two.contrast_std": 0.0881429963235766,
+            "face-two.edge_mean": 0.3733553142979383,
+            "face-two.ev_mean": -2.2777758875867704,
+            "face-two.green_mean": 0.20544295493605344,
+            "face-two.highlight_fraction": 0.0,
+            "face-two.mean_luminance": 0.206215418763083,
+            "face-two.p05_luminance": 0.08127941952194234,
+            "face-two.p50_luminance": 0.194046693446561,
+            "face-two.p95_luminance": 0.3648693828396989,
+            "face-two.pixel_count": 256,
+            "face-two.red_mean": 0.20782360919402137,
+            "face-two.shadow_fraction": 0.0
+          },
+          "missing_evidence": [],
+          "state": "measured_proxy",
+          "uncertainty": [
+            "uncalibrated_photometric_proxy",
+            "no_reference_chart_or_human_preference"
+          ]
+        },
+        "highlight_integrity": {
+          "absolute_quality_score": null,
+          "evidence_refs": [],
+          "facts": {},
+          "missing_evidence": [
+            "valid_highlight_region"
+          ],
+          "state": "unobservable",
+          "uncertainty": [
+            "uncalibrated_photometric_proxy",
+            "no_reference_chart_or_human_preference"
+          ]
+        },
+        "lighting_causality": {
+          "absolute_quality_score": null,
+          "evidence_refs": [],
+          "facts": {},
+          "missing_evidence": [
+            "valid_face_highlight_region",
+            "valid_face_shadow_region"
+          ],
+          "state": "unobservable",
+          "uncertainty": [
+            "uncalibrated_photometric_proxy",
+            "no_reference_chart_or_human_preference",
+            "internal_contrast_does_not_establish_physical_lighting_causation"
+          ]
+        },
+        "local_face_lift_naturalness": {
+          "absolute_quality_score": null,
+          "evidence_refs": [
+            "roi:face-one",
+            "roi:face-two"
+          ],
+          "facts": {
+            "face-one.blue_mean": 0.22654164105549537,
+            "face-one.contrast_std": 0.09369674508105678,
+            "face-one.edge_mean": 0.3601401594926896,
+            "face-one.ev_mean": -2.1693492585169203,
+            "face-one.green_mean": 0.21559096753772525,
+            "face-one.highlight_fraction": 0.0,
+            "face-one.mean_luminance": 0.22231092316140424,
+            "face-one.p05_luminance": 0.10240943613665204,
+            "face-one.p50_luminance": 0.2009241737440346,
+            "face-one.p95_luminance": 0.4045171730574153,
+            "face-one.pixel_count": 256,
+            "face-one.red_mean": 0.24348051126160106,
+            "face-one.shadow_fraction": 0.0,
+            "face-two.blue_mean": 0.20913182933751595,
+            "face-two.contrast_std": 0.0881429963235766,
+            "face-two.edge_mean": 0.3733553142979383,
+            "face-two.ev_mean": -2.2777758875867704,
+            "face-two.green_mean": 0.20544295493605344,
+            "face-two.highlight_fraction": 0.0,
+            "face-two.mean_luminance": 0.206215418763083,
+            "face-two.p05_luminance": 0.08127941952194234,
+            "face-two.p50_luminance": 0.194046693446561,
+            "face-two.p95_luminance": 0.3648693828396989,
+            "face-two.pixel_count": 256,
+            "face-two.red_mean": 0.20782360919402137,
+            "face-two.shadow_fraction": 0.0
+          },
+          "missing_evidence": [
+            "valid_face_ring_region",
+            "valid_background_region"
+          ],
+          "state": "unobservable",
+          "uncertainty": [
+            "uncalibrated_photometric_proxy",
+            "no_reference_chart_or_human_preference",
+            "boundary_contrast_is_not_human_naturalness"
+          ]
+        },
+        "multi_face_consistency": {
+          "absolute_quality_score": null,
+          "evidence_refs": [
+            "roi:face-one",
+            "roi:face-two"
+          ],
+          "facts": {
+            "face_luminance_spread": 0.016095504398321248,
+            "person_count": 2
+          },
+          "missing_evidence": [],
+          "state": "measured_proxy",
+          "uncertainty": [
+            "uncalibrated_photometric_proxy",
+            "no_reference_chart_or_human_preference",
+            "different_skin_reflectance_and_lighting_confound_consistency"
+          ]
+        },
+        "scene_adaptability": {
+          "absolute_quality_score": null,
+          "evidence_refs": [],
+          "facts": {},
+          "missing_evidence": [
+            "multiple_comparable_scenes"
+          ],
+          "state": "not_applicable",
+          "uncertainty": []
+        },
+        "shadow_black_rendering": {
+          "absolute_quality_score": null,
+          "evidence_refs": [],
+          "facts": {},
+          "missing_evidence": [
+            "valid_background_region",
+            "valid_shadow_region"
+          ],
+          "state": "unobservable",
+          "uncertainty": [
+            "uncalibrated_photometric_proxy",
+            "no_reference_chart_or_human_preference"
+          ]
+        },
+        "skin_awb": {
+          "absolute_quality_score": null,
+          "evidence_refs": [],
+          "facts": {},
+          "missing_evidence": [
+            "valid_skin_region",
+            "illumination_or_color_reference"
+          ],
+          "state": "unobservable",
+          "uncertainty": [
+            "uncalibrated_photometric_proxy",
+            "no_reference_chart_or_human_preference",
+            "skin_rgb_is_not_white_balance_accuracy"
+          ]
+        }
+      },
+      "id": "C16",
+      "objective": {
+        "blue_mean": 0.20753062998476252,
+        "contrast_std": 0.08830312336384477,
+        "edge_mean": 0.3785738049438059,
+        "ev_mean": -2.2671387182892295,
+        "green_mean": 0.20720723965410037,
+        "highlight_fraction": 0.0,
+        "mean_luminance": 0.20774148963866557,
+        "p05_luminance": 0.08629186453343016,
+        "p50_luminance": 0.1950646433241818,
+        "p95_luminance": 0.36375552380327175,
+        "pixel_count": 4096,
+        "red_mean": 0.20961034973261125,
+        "shadow_fraction": 0.0
+      },
+      "persons": {
+        "one": {
+          "face-one": {
+            "blue_mean": 0.22654164105549537,
+            "contrast_std": 0.09369674508105678,
+            "edge_mean": 0.3601401594926896,
+            "ev_mean": -2.1693492585169203,
+            "green_mean": 0.21559096753772525,
+            "highlight_fraction": 0.0,
+            "mean_luminance": 0.22231092316140424,
+            "p05_luminance": 0.10240943613665204,
+            "p50_luminance": 0.2009241737440346,
+            "p95_luminance": 0.4045171730574153,
+            "pixel_count": 256,
+            "red_mean": 0.24348051126160106,
+            "shadow_fraction": 0.0
+          }
+        },
+        "two": {
+          "face-two": {
+            "blue_mean": 0.20913182933751595,
+            "contrast_std": 0.0881429963235766,
+            "edge_mean": 0.3733553142979383,
+            "ev_mean": -2.2777758875867704,
+            "green_mean": 0.20544295493605344,
+            "highlight_fraction": 0.0,
+            "mean_luminance": 0.206215418763083,
+            "p05_luminance": 0.08127941952194234,
+            "p50_luminance": 0.194046693446561,
+            "p95_luminance": 0.3648693828396989,
+            "pixel_count": 256,
+            "red_mean": 0.20782360919402137,
+            "shadow_fraction": 0.0
+          }
+        }
+      },
+      "reasons": [],
+      "rois": {
+        "face-one": {
+          "bbox": [
+            8,
+            8,
+            16,
+            16
+          ],
+          "id": "face-one",
+          "kind": "face",
+          "objective": {
+            "blue_mean": 0.22654164105549537,
+            "contrast_std": 0.09369674508105678,
+            "edge_mean": 0.3601401594926896,
+            "ev_mean": -2.1693492585169203,
+            "green_mean": 0.21559096753772525,
+            "highlight_fraction": 0.0,
+            "mean_luminance": 0.22231092316140424,
+            "p05_luminance": 0.10240943613665204,
+            "p50_luminance": 0.2009241737440346,
+            "p95_luminance": 0.4045171730574153,
+            "pixel_count": 256,
+            "red_mean": 0.24348051126160106,
+            "shadow_fraction": 0.0
+          },
+          "person_id": "one",
+          "reasons": [],
+          "state": "measured_proxy"
+        },
+        "face-two": {
+          "bbox": [
+            40,
+            40,
+            16,
+            16
+          ],
+          "id": "face-two",
+          "kind": "face",
+          "objective": {
+            "blue_mean": 0.20913182933751595,
+            "contrast_std": 0.0881429963235766,
+            "edge_mean": 0.3733553142979383,
+            "ev_mean": -2.2777758875867704,
+            "green_mean": 0.20544295493605344,
+            "highlight_fraction": 0.0,
+            "mean_luminance": 0.206215418763083,
+            "p05_luminance": 0.08127941952194234,
+            "p50_luminance": 0.194046693446561,
+            "p95_luminance": 0.3648693828396989,
+            "pixel_count": 256,
+            "red_mean": 0.20782360919402137,
+            "shadow_fraction": 0.0
+          },
+          "person_id": "two",
+          "reasons": [],
+          "state": "measured_proxy"
+        }
+      },
+      "state": "valid",
+      "trace": {
+        "asset_id": "C16",
+        "bit_depth": 16,
+        "byte_count": 23774,
+        "declared_source_sha256": "5605e818472b94d1d06efb727b0e002cbfd28bcbba71b8c7a5546368ed65ace6",
+        "decoded_pixels_sha256": "0a3232bdd5651a2b59be243fe4f57afd5dbd7386edd5183df5420e106aa83dac",
+        "decoder": "opencv_unchanged",
+        "dtype": "uint16",
+        "encoding": "srgb",
+        "exif_orientation": 1,
+        "normalization_denominator": 65535.0,
+        "orientation_convention": "exif_transposed",
+        "oriented_shape": [
+          64,
+          64,
+          3
+        ],
+        "original_shape": [
+          64,
+          64,
+          3
+        ],
+        "path": "/workspace/scratch/617f8bd555c4/FroneCamera-implementation/evidence/build/task-1-example/candidate-16bit.png",
+        "source_bytes_sha256": "371df826185568fa2aec1d4b45d938a6b3bfedcdbd584792f777682880273cb9",
+        "warnings": []
+      }
+    },
+    {
+      "dimensions": {
+        "artifact_texture_control": {
+          "absolute_quality_score": null,
+          "evidence_refs": [
+            "roi:face-one",
+            "roi:face-two"
+          ],
+          "facts": {
+            "face-one.blue_mean": 1.0,
+            "face-one.contrast_std": 0.0,
+            "face-one.edge_mean": 0.0,
+            "face-one.ev_mean": 0.0,
+            "face-one.green_mean": 1.0,
+            "face-one.highlight_fraction": 1.0,
+            "face-one.mean_luminance": 1.0,
+            "face-one.p05_luminance": 1.0,
+            "face-one.p50_luminance": 1.0,
+            "face-one.p95_luminance": 1.0,
+            "face-one.pixel_count": 256,
+            "face-one.red_mean": 1.0,
+            "face-one.shadow_fraction": 0.0,
+            "face-two.blue_mean": 0.20913182933751595,
+            "face-two.contrast_std": 0.0881429963235766,
+            "face-two.edge_mean": 0.3733553142979383,
+            "face-two.ev_mean": -2.2777758875867704,
+            "face-two.green_mean": 0.20544295493605344,
+            "face-two.highlight_fraction": 0.0,
+            "face-two.mean_luminance": 0.206215418763083,
+            "face-two.p05_luminance": 0.08127941952194234,
+            "face-two.p50_luminance": 0.194046693446561,
+            "face-two.p95_luminance": 0.3648693828396989,
+            "face-two.pixel_count": 256,
+            "face-two.red_mean": 0.20782360919402137,
+            "face-two.shadow_fraction": 0.0
+          },
+          "missing_evidence": [
+            "valid_edge_region"
+          ],
+          "state": "unobservable",
+          "uncertainty": [
+            "uncalibrated_photometric_proxy",
+            "no_reference_chart_or_human_preference"
+          ]
+        },
+        "face_background_relation": {
+          "absolute_quality_score": null,
+          "evidence_refs": [
+            "roi:face-one",
+            "roi:face-two"
+          ],
+          "facts": {
+            "face-one.blue_mean": 1.0,
+            "face-one.contrast_std": 0.0,
+            "face-one.edge_mean": 0.0,
+            "face-one.ev_mean": 0.0,
+            "face-one.green_mean": 1.0,
+            "face-one.highlight_fraction": 1.0,
+            "face-one.mean_luminance": 1.0,
+            "face-one.p05_luminance": 1.0,
+            "face-one.p50_luminance": 1.0,
+            "face-one.p95_luminance": 1.0,
+            "face-one.pixel_count": 256,
+            "face-one.red_mean": 1.0,
+            "face-one.shadow_fraction": 0.0,
+            "face-two.blue_mean": 0.20913182933751595,
+            "face-two.contrast_std": 0.0881429963235766,
+            "face-two.edge_mean": 0.3733553142979383,
+            "face-two.ev_mean": -2.2777758875867704,
+            "face-two.green_mean": 0.20544295493605344,
+            "face-two.highlight_fraction": 0.0,
+            "face-two.mean_luminance": 0.206215418763083,
+            "face-two.p05_luminance": 0.08127941952194234,
+            "face-two.p50_luminance": 0.194046693446561,
+            "face-two.p95_luminance": 0.3648693828396989,
+            "face-two.pixel_count": 256,
+            "face-two.red_mean": 0.20782360919402137,
+            "face-two.shadow_fraction": 0.0
+          },
+          "missing_evidence": [
+            "valid_face_ring_region",
+            "valid_background_region"
+          ],
+          "state": "unobservable",
+          "uncertainty": [
+            "uncalibrated_photometric_proxy",
+            "no_reference_chart_or_human_preference"
+          ]
+        },
+        "face_exposure_readability": {
+          "absolute_quality_score": null,
+          "evidence_refs": [
+            "roi:face-one",
+            "roi:face-two"
+          ],
+          "facts": {
+            "face-one.blue_mean": 1.0,
+            "face-one.contrast_std": 0.0,
+            "face-one.edge_mean": 0.0,
+            "face-one.ev_mean": 0.0,
+            "face-one.green_mean": 1.0,
+            "face-one.highlight_fraction": 1.0,
+            "face-one.mean_luminance": 1.0,
+            "face-one.p05_luminance": 1.0,
+            "face-one.p50_luminance": 1.0,
+            "face-one.p95_luminance": 1.0,
+            "face-one.pixel_count": 256,
+            "face-one.red_mean": 1.0,
+            "face-one.shadow_fraction": 0.0,
+            "face-two.blue_mean": 0.20913182933751595,
+            "face-two.contrast_std": 0.0881429963235766,
+            "face-two.edge_mean": 0.3733553142979383,
+            "face-two.ev_mean": -2.2777758875867704,
+            "face-two.green_mean": 0.20544295493605344,
+            "face-two.highlight_fraction": 0.0,
+            "face-two.mean_luminance": 0.206215418763083,
+            "face-two.p05_luminance": 0.08127941952194234,
+            "face-two.p50_luminance": 0.194046693446561,
+            "face-two.p95_luminance": 0.3648693828396989,
+            "face-two.pixel_count": 256,
+            "face-two.red_mean": 0.20782360919402137,
+            "face-two.shadow_fraction": 0.0
+          },
+          "missing_evidence": [],
+          "state": "measured_proxy",
+          "uncertainty": [
+            "uncalibrated_photometric_proxy",
+            "no_reference_chart_or_human_preference"
+          ]
+        },
+        "highlight_integrity": {
+          "absolute_quality_score": null,
+          "evidence_refs": [],
+          "facts": {},
+          "missing_evidence": [
+            "valid_highlight_region"
+          ],
+          "state": "unobservable",
+          "uncertainty": [
+            "uncalibrated_photometric_proxy",
+            "no_reference_chart_or_human_preference"
+          ]
+        },
+        "lighting_causality": {
+          "absolute_quality_score": null,
+          "evidence_refs": [],
+          "facts": {},
+          "missing_evidence": [
+            "valid_face_highlight_region",
+            "valid_face_shadow_region"
+          ],
+          "state": "unobservable",
+          "uncertainty": [
+            "uncalibrated_photometric_proxy",
+            "no_reference_chart_or_human_preference",
+            "internal_contrast_does_not_establish_physical_lighting_causation"
+          ]
+        },
+        "local_face_lift_naturalness": {
+          "absolute_quality_score": null,
+          "evidence_refs": [
+            "roi:face-one",
+            "roi:face-two"
+          ],
+          "facts": {
+            "face-one.blue_mean": 1.0,
+            "face-one.contrast_std": 0.0,
+            "face-one.edge_mean": 0.0,
+            "face-one.ev_mean": 0.0,
+            "face-one.green_mean": 1.0,
+            "face-one.highlight_fraction": 1.0,
+            "face-one.mean_luminance": 1.0,
+            "face-one.p05_luminance": 1.0,
+            "face-one.p50_luminance": 1.0,
+            "face-one.p95_luminance": 1.0,
+            "face-one.pixel_count": 256,
+            "face-one.red_mean": 1.0,
+            "face-one.shadow_fraction": 0.0,
+            "face-two.blue_mean": 0.20913182933751595,
+            "face-two.contrast_std": 0.0881429963235766,
+            "face-two.edge_mean": 0.3733553142979383,
+            "face-two.ev_mean": -2.2777758875867704,
+            "face-two.green_mean": 0.20544295493605344,
+            "face-two.highlight_fraction": 0.0,
+            "face-two.mean_luminance": 0.206215418763083,
+            "face-two.p05_luminance": 0.08127941952194234,
+            "face-two.p50_luminance": 0.194046693446561,
+            "face-two.p95_luminance": 0.3648693828396989,
+            "face-two.pixel_count": 256,
+            "face-two.red_mean": 0.20782360919402137,
+            "face-two.shadow_fraction": 0.0
+          },
+          "missing_evidence": [
+            "valid_face_ring_region",
+            "valid_background_region"
+          ],
+          "state": "unobservable",
+          "uncertainty": [
+            "uncalibrated_photometric_proxy",
+            "no_reference_chart_or_human_preference",
+            "boundary_contrast_is_not_human_naturalness"
+          ]
+        },
+        "multi_face_consistency": {
+          "absolute_quality_score": null,
+          "evidence_refs": [
+            "roi:face-one",
+            "roi:face-two"
+          ],
+          "facts": {
+            "face_luminance_spread": 0.793784581236917,
+            "person_count": 2
+          },
+          "missing_evidence": [],
+          "state": "measured_proxy",
+          "uncertainty": [
+            "uncalibrated_photometric_proxy",
+            "no_reference_chart_or_human_preference",
+            "different_skin_reflectance_and_lighting_confound_consistency"
+          ]
+        },
+        "scene_adaptability": {
+          "absolute_quality_score": null,
+          "evidence_refs": [],
+          "facts": {},
+          "missing_evidence": [
+            "multiple_comparable_scenes"
+          ],
+          "state": "not_applicable",
+          "uncertainty": []
+        },
+        "shadow_black_rendering": {
+          "absolute_quality_score": null,
+          "evidence_refs": [],
+          "facts": {},
+          "missing_evidence": [
+            "valid_background_region",
+            "valid_shadow_region"
+          ],
+          "state": "unobservable",
+          "uncertainty": [
+            "uncalibrated_photometric_proxy",
+            "no_reference_chart_or_human_preference"
+          ]
+        },
+        "skin_awb": {
+          "absolute_quality_score": null,
+          "evidence_refs": [],
+          "facts": {},
+          "missing_evidence": [
+            "valid_skin_region",
+            "illumination_or_color_reference"
+          ],
+          "state": "unobservable",
+          "uncertainty": [
+            "uncalibrated_photometric_proxy",
+            "no_reference_chart_or_human_preference",
+            "skin_rgb_is_not_white_balance_accuracy"
+          ]
+        }
+      },
+      "id": "destroyed-face",
+      "objective": {
+        "blue_mean": 0.2558717774187941,
+        "contrast_std": 0.2100061376448822,
+        "edge_mean": 0.4447437357363936,
+        "ev_mean": -1.9638297602919441,
+        "green_mean": 0.25623280418299255,
+        "highlight_fraction": 0.0625,
+        "mean_luminance": 0.25634705694107784,
+        "p05_luminance": 0.08656947581109933,
+        "p50_luminance": 0.20424666958274446,
+        "p95_luminance": 1.0,
+        "pixel_count": 4096,
+        "red_mean": 0.25689281777876116,
+        "shadow_fraction": 0.0
+      },
+      "persons": {
+        "one": {
+          "face-one": {
+            "blue_mean": 1.0,
+            "contrast_std": 0.0,
+            "edge_mean": 0.0,
+            "ev_mean": 0.0,
+            "green_mean": 1.0,
+            "highlight_fraction": 1.0,
+            "mean_luminance": 1.0,
+            "p05_luminance": 1.0,
+            "p50_luminance": 1.0,
+            "p95_luminance": 1.0,
+            "pixel_count": 256,
+            "red_mean": 1.0,
+            "shadow_fraction": 0.0
+          }
+        },
+        "two": {
+          "face-two": {
+            "blue_mean": 0.20913182933751595,
+            "contrast_std": 0.0881429963235766,
+            "edge_mean": 0.3733553142979383,
+            "ev_mean": -2.2777758875867704,
+            "green_mean": 0.20544295493605344,
+            "highlight_fraction": 0.0,
+            "mean_luminance": 0.206215418763083,
+            "p05_luminance": 0.08127941952194234,
+            "p50_luminance": 0.194046693446561,
+            "p95_luminance": 0.3648693828396989,
+            "pixel_count": 256,
+            "red_mean": 0.20782360919402137,
+            "shadow_fraction": 0.0
+          }
+        }
+      },
+      "reasons": [],
+      "rois": {
+        "face-one": {
+          "bbox": [
+            8,
+            8,
+            16,
+            16
+          ],
+          "id": "face-one",
+          "kind": "face",
+          "objective": {
+            "blue_mean": 1.0,
+            "contrast_std": 0.0,
+            "edge_mean": 0.0,
+            "ev_mean": 0.0,
+            "green_mean": 1.0,
+            "highlight_fraction": 1.0,
+            "mean_luminance": 1.0,
+            "p05_luminance": 1.0,
+            "p50_luminance": 1.0,
+            "p95_luminance": 1.0,
+            "pixel_count": 256,
+            "red_mean": 1.0,
+            "shadow_fraction": 0.0
+          },
+          "person_id": "one",
+          "reasons": [],
+          "state": "measured_proxy"
+        },
+        "face-two": {
+          "bbox": [
+            40,
+            40,
+            16,
+            16
+          ],
+          "id": "face-two",
+          "kind": "face",
+          "objective": {
+            "blue_mean": 0.20913182933751595,
+            "contrast_std": 0.0881429963235766,
+            "edge_mean": 0.3733553142979383,
+            "ev_mean": -2.2777758875867704,
+            "green_mean": 0.20544295493605344,
+            "highlight_fraction": 0.0,
+            "mean_luminance": 0.206215418763083,
+            "p05_luminance": 0.08127941952194234,
+            "p50_luminance": 0.194046693446561,
+            "p95_luminance": 0.3648693828396989,
+            "pixel_count": 256,
+            "red_mean": 0.20782360919402137,
+            "shadow_fraction": 0.0
+          },
+          "person_id": "two",
+          "reasons": [],
+          "state": "measured_proxy"
+        }
+      },
+      "state": "valid",
+      "trace": {
+        "asset_id": "destroyed-face",
+        "bit_depth": 8,
+        "byte_count": 11234,
+        "declared_source_sha256": "5605e818472b94d1d06efb727b0e002cbfd28bcbba71b8c7a5546368ed65ace6",
+        "decoded_pixels_sha256": "e951fbaf69877227d36908a0c2d1e5ef5d9677be17cb02ef86cf41fe26d1e123",
+        "decoder": "opencv_unchanged",
+        "dtype": "uint8",
+        "encoding": "srgb",
+        "exif_orientation": 1,
+        "normalization_denominator": 255.0,
+        "orientation_convention": "exif_transposed",
+        "oriented_shape": [
+          64,
+          64,
+          3
+        ],
+        "original_shape": [
+          64,
+          64,
+          3
+        ],
+        "path": "/workspace/scratch/617f8bd555c4/FroneCamera-implementation/evidence/build/task-1-example/candidate-local-collapse.png",
+        "source_bytes_sha256": "a1f6ff0900de6733f910f891970ed781f663e4b999540055df621fe493f9a0a3",
+        "warnings": []
+      }
+    },
+    {
+      "dimensions": {
+        "artifact_texture_control": {
+          "absolute_quality_score": null,
+          "evidence_refs": [],
+          "facts": {},
+          "missing_evidence": [
+            "valid_face_region",
+            "valid_edge_region"
+          ],
+          "state": "unobservable",
+          "uncertainty": [
+            "uncalibrated_photometric_proxy",
+            "no_reference_chart_or_human_preference"
+          ]
+        },
+        "face_background_relation": {
+          "absolute_quality_score": null,
+          "evidence_refs": [],
+          "facts": {},
+          "missing_evidence": [
+            "valid_face_region",
+            "valid_face_ring_region",
+            "valid_background_region"
+          ],
+          "state": "unobservable",
+          "uncertainty": [
+            "uncalibrated_photometric_proxy",
+            "no_reference_chart_or_human_preference"
+          ]
+        },
+        "face_exposure_readability": {
+          "absolute_quality_score": null,
+          "evidence_refs": [],
+          "facts": {},
+          "missing_evidence": [
+            "valid_face_region"
+          ],
+          "state": "unobservable",
+          "uncertainty": [
+            "uncalibrated_photometric_proxy",
+            "no_reference_chart_or_human_preference"
+          ]
+        },
+        "highlight_integrity": {
+          "absolute_quality_score": null,
+          "evidence_refs": [],
+          "facts": {},
+          "missing_evidence": [
+            "valid_highlight_region"
+          ],
+          "state": "unobservable",
+          "uncertainty": [
+            "uncalibrated_photometric_proxy",
+            "no_reference_chart_or_human_preference"
+          ]
+        },
+        "lighting_causality": {
+          "absolute_quality_score": null,
+          "evidence_refs": [],
+          "facts": {},
+          "missing_evidence": [
+            "valid_face_highlight_region",
+            "valid_face_shadow_region"
+          ],
+          "state": "unobservable",
+          "uncertainty": [
+            "uncalibrated_photometric_proxy",
+            "no_reference_chart_or_human_preference",
+            "internal_contrast_does_not_establish_physical_lighting_causation"
+          ]
+        },
+        "local_face_lift_naturalness": {
+          "absolute_quality_score": null,
+          "evidence_refs": [],
+          "facts": {},
+          "missing_evidence": [
+            "valid_face_region",
+            "valid_face_ring_region",
+            "valid_background_region"
+          ],
+          "state": "unobservable",
+          "uncertainty": [
+            "uncalibrated_photometric_proxy",
+            "no_reference_chart_or_human_preference",
+            "boundary_contrast_is_not_human_naturalness"
+          ]
+        },
+        "multi_face_consistency": {
+          "absolute_quality_score": null,
+          "evidence_refs": [],
+          "facts": {},
+          "missing_evidence": [
+            "at_least_two_valid_person_faces"
+          ],
+          "state": "not_applicable",
+          "uncertainty": []
+        },
+        "scene_adaptability": {
+          "absolute_quality_score": null,
+          "evidence_refs": [],
+          "facts": {},
+          "missing_evidence": [
+            "multiple_comparable_scenes"
+          ],
+          "state": "not_applicable",
+          "uncertainty": []
+        },
+        "shadow_black_rendering": {
+          "absolute_quality_score": null,
+          "evidence_refs": [],
+          "facts": {},
+          "missing_evidence": [
+            "valid_background_region",
+            "valid_shadow_region"
+          ],
+          "state": "unobservable",
+          "uncertainty": [
+            "uncalibrated_photometric_proxy",
+            "no_reference_chart_or_human_preference"
+          ]
+        },
+        "skin_awb": {
+          "absolute_quality_score": null,
+          "evidence_refs": [],
+          "facts": {},
+          "missing_evidence": [
+            "valid_skin_region",
+            "illumination_or_color_reference"
+          ],
+          "state": "unobservable",
+          "uncertainty": [
+            "uncalibrated_photometric_proxy",
+            "no_reference_chart_or_human_preference",
+            "skin_rgb_is_not_white_balance_accuracy"
+          ]
+        }
+      },
+      "id": "source",
+      "objective": {
+        "blue_mean": 0.41250759176503377,
+        "contrast_std": 0.17577924537267983,
+        "edge_mean": 0.7539851733085687,
+        "ev_mean": -1.2759305099598113,
+        "green_mean": 0.41194110823597874,
+        "highlight_fraction": 0.0,
+        "mean_luminance": 0.41295872289954394,
+        "p05_luminance": 0.1716915981990193,
+        "p50_luminance": 0.38803747730519045,
+        "p95_luminance": 0.7228861270447045,
+        "pixel_count": 4096,
+        "red_mean": 0.4165352500646119,
+        "shadow_fraction": 0.0
+      },
+      "persons": {},
+      "reasons": [],
+      "rois": {},
+      "state": "valid",
+      "trace": {
+        "asset_id": "source",
+        "bit_depth": 64,
+        "byte_count": 98432,
+        "declared_source_sha256": null,
+        "decoded_pixels_sha256": "72ba20e6d71febd0b243ec4fc350b9be9662a6cdbbdd9584306fc5a634fabdde",
+        "decoder": "numpy_safe",
+        "dtype": "float64",
+        "encoding": "linear",
+        "exif_orientation": 1,
+        "normalization_denominator": 1.0,
+        "orientation_convention": "exif_transposed",
+        "oriented_shape": [
+          64,
+          64,
+          3
+        ],
+        "original_shape": [
+          64,
+          64,
+          3
+        ],
+        "path": "/workspace/scratch/617f8bd555c4/FroneCamera-implementation/evidence/build/task-1-example/source.npy",
+        "source_bytes_sha256": "5605e818472b94d1d06efb727b0e002cbfd28bcbba71b8c7a5546368ed65ace6",
+        "warnings": []
+      }
+    }
+  ],
+  "baseline_id": "B",
+  "comparisons": [
+    {
+      "absolute_quality_score": null,
+      "alignment": {
+        "overlap_fraction": 1.0,
+        "reasons": [],
+        "response": 0.9211139777658657,
+        "shift_x": 0.008036478834618777,
+        "shift_y": 0.009350933696286035,
+        "state": "measured_proxy",
+        "valid_pixels": 4096
+      },
+      "baseline_id": "B",
+      "candidate_id": "C16",
+      "controllability": "unobservable",
+      "fatal_reasons": [],
+      "relative_metrics": {
+        "aligned_edge_correlation": 0.9982478424431771,
+        "aligned_pixel_mae": 0.0012854147795539732,
+        "blue_mean_delta": 0.001276834102245633,
+        "contrast_std_delta": 0.000413500677504855,
+        "edge_correlation": 0.9982478424431771,
+        "edge_mean_delta": 0.0015812182895215132,
+        "ev_mean_delta": 0.008791791670581528,
+        "green_mean_delta": 0.001236685536111004,
+        "highlight_fraction_delta": 0.0,
+        "mean_luminance_delta": 0.0012621281888935965,
+        "p05_luminance_delta": 0.0004460654339205061,
+        "p50_luminance_delta": 0.0010459046715865783,
+        "p95_luminance_delta": 0.002312460280919526,
+        "pixel_mae": 0.0012854147795539732,
+        "red_mean_delta": 0.0013427247003053033,
+        "shadow_fraction_delta": 0.0
+      },
+      "relative_rois": {
+        "face-one": {
+          "blue_mean_delta": 0.020429345635930046,
+          "contrast_std_delta": 0.005268771717568385,
+          "edge_mean_delta": 0.02024932659575085,
+          "ev_mean_delta": 0.13738907756513274,
+          "green_mean_delta": 0.0197869685777759,
+          "highlight_fraction_delta": 0.0,
+          "mean_luminance_delta": 0.02019405102229796,
+          "p05_luminance_delta": 0.012948766441411644,
+          "p50_luminance_delta": 0.019682769252980847,
+          "p95_luminance_delta": 0.02964784758119099,
+          "red_mean_delta": 0.02148359520488477,
+          "shadow_fraction_delta": 0.0
+        },
+        "face-two": {
+          "blue_mean_delta": 0.0,
+          "contrast_std_delta": 0.0,
+          "edge_mean_delta": 0.0,
+          "ev_mean_delta": 0.0,
+          "green_mean_delta": 0.0,
+          "highlight_fraction_delta": 0.0,
+          "mean_luminance_delta": 0.0,
+          "p05_luminance_delta": 0.0,
+          "p50_luminance_delta": 0.0,
+          "p95_luminance_delta": 0.0,
+          "red_mean_delta": 0.0,
+          "shadow_fraction_delta": 0.0
+        }
+      },
+      "review_reasons": [
+        "uncalibrated_quality_requires_review",
+        "declared_lineage_not_independently_verified"
+      ],
+      "same_source_status": "hash_bound_declaration",
+      "status": "REVIEW",
+      "style_preference": "requires_human_review",
+      "uncertainty": [
+        "no_calibrated_absolute_score",
+        "no_semantic_content_or_style_judge",
+        "translation_diagnostic_uses_rounded_shift_and_overlap_only"
+      ]
+    },
+    {
+      "absolute_quality_score": null,
+      "alignment": {
+        "overlap_fraction": 1.0,
+        "reasons": [],
+        "response": 0.2576725840638988,
+        "shift_x": 0.2528878043849758,
+        "shift_y": 0.3313252530444579,
+        "state": "measured_proxy",
+        "valid_pixels": 4096
+      },
+      "baseline_id": "B",
+      "candidate_id": "destroyed-face",
+      "controllability": "unobservable",
+      "fatal_reasons": [
+        "local_content_collapse:face-one",
+        "local_destructive_highlight_occupancy:face-one"
+      ],
+      "relative_metrics": {
+        "aligned_edge_correlation": 0.3493439740414813,
+        "aligned_pixel_mae": 0.04950180811591185,
+        "blue_mean_delta": 0.049617981536277195,
+        "contrast_std_delta": 0.1221165149585423,
+        "edge_correlation": 0.3493439740414813,
+        "edge_mean_delta": 0.06775114908210922,
+        "ev_mean_delta": 0.31210074966786694,
+        "green_mean_delta": 0.05026225006500318,
+        "highlight_fraction_delta": 0.0625,
+        "mean_luminance_delta": 0.049867695491305875,
+        "p05_luminance_delta": 0.0007236767115896825,
+        "p50_luminance_delta": 0.010227930930149232,
+        "p95_luminance_delta": 0.6385569364776478,
+        "pixel_mae": 0.04950180811591185,
+        "red_mean_delta": 0.048625192746455215,
+        "shadow_fraction_delta": 0.0
+      },
+      "relative_rois": {
+        "face-one": {
+          "blue_mean_delta": 0.7938877045804347,
+          "contrast_std_delta": -0.0884279733634884,
+          "edge_mean_delta": -0.3398908328969388,
+          "ev_mean_delta": 2.306738336082053,
+          "green_mean_delta": 0.8041960010400506,
+          "highlight_fraction_delta": 1.0,
+          "mean_luminance_delta": 0.7978831278608938,
+          "p05_luminance_delta": 0.9105393303047596,
+          "p50_luminance_delta": 0.8187585955089463,
+          "p95_luminance_delta": 0.6251306745237757,
+          "red_mean_delta": 0.7780030839432837,
+          "shadow_fraction_delta": 0.0
+        },
+        "face-two": {
+          "blue_mean_delta": 0.0,
+          "contrast_std_delta": 0.0,
+          "edge_mean_delta": 0.0,
+          "ev_mean_delta": 0.0,
+          "green_mean_delta": 0.0,
+          "highlight_fraction_delta": 0.0,
+          "mean_luminance_delta": 0.0,
+          "p05_luminance_delta": 0.0,
+          "p50_luminance_delta": 0.0,
+          "p95_luminance_delta": 0.0,
+          "red_mean_delta": 0.0,
+          "shadow_fraction_delta": 0.0
+        }
+      },
+      "review_reasons": [
+        "uncalibrated_quality_requires_review",
+        "declared_lineage_not_independently_verified"
+      ],
+      "same_source_status": "hash_bound_declaration",
+      "status": "REJECT",
+      "style_preference": "requires_human_review",
+      "uncertainty": [
+        "no_calibrated_absolute_score",
+        "no_semantic_content_or_style_judge",
+        "translation_diagnostic_uses_rounded_shift_and_overlap_only"
+      ]
+    }
+  ],
+  "input_trace": {
+    "group_id": "fixture-only-not-production-canonical",
+    "input_sha256": "451f72fe63f4de2e91cdae56bcba79826de1f9a5accf8334f4e47fda1a2ac880",
+    "luminance_domain": "linear_declared_encoding",
+    "ordered_assets": [
+      {
+        "asset_id": "B",
+        "bit_depth": 8,
+        "byte_count": 11908,
+        "declared_source_sha256": "5605e818472b94d1d06efb727b0e002cbfd28bcbba71b8c7a5546368ed65ace6",
+        "decoded_pixels_sha256": "1474112c80443e26f6ff684d1bb7b6e657b8f278e4b958e14cbfc867b6e60d67",
+        "decoder": "opencv_unchanged",
+        "dtype": "uint8",
+        "encoding": "srgb",
+        "exif_orientation": 1,
+        "normalization_denominator": 255.0,
+        "orientation_convention": "exif_transposed",
+        "oriented_shape": [
+          64,
+          64,
+          3
+        ],
+        "original_shape": [
+          64,
+          64,
+          3
+        ],
+        "path": "/workspace/scratch/617f8bd555c4/FroneCamera-implementation/evidence/build/task-1-example/baseline.png",
+        "source_bytes_sha256": "8327b144e28963e2ca7e65a355c45655485a20b0e1fc7ddc0f6238715fd59e07",
+        "warnings": []
+      },
+      {
+        "asset_id": "C16",
+        "bit_depth": 16,
+        "byte_count": 23774,
+        "declared_source_sha256": "5605e818472b94d1d06efb727b0e002cbfd28bcbba71b8c7a5546368ed65ace6",
+        "decoded_pixels_sha256": "0a3232bdd5651a2b59be243fe4f57afd5dbd7386edd5183df5420e106aa83dac",
+        "decoder": "opencv_unchanged",
+        "dtype": "uint16",
+        "encoding": "srgb",
+        "exif_orientation": 1,
+        "normalization_denominator": 65535.0,
+        "orientation_convention": "exif_transposed",
+        "oriented_shape": [
+          64,
+          64,
+          3
+        ],
+        "original_shape": [
+          64,
+          64,
+          3
+        ],
+        "path": "/workspace/scratch/617f8bd555c4/FroneCamera-implementation/evidence/build/task-1-example/candidate-16bit.png",
+        "source_bytes_sha256": "371df826185568fa2aec1d4b45d938a6b3bfedcdbd584792f777682880273cb9",
+        "warnings": []
+      },
+      {
+        "asset_id": "destroyed-face",
+        "bit_depth": 8,
+        "byte_count": 11234,
+        "declared_source_sha256": "5605e818472b94d1d06efb727b0e002cbfd28bcbba71b8c7a5546368ed65ace6",
+        "decoded_pixels_sha256": "e951fbaf69877227d36908a0c2d1e5ef5d9677be17cb02ef86cf41fe26d1e123",
+        "decoder": "opencv_unchanged",
+        "dtype": "uint8",
+        "encoding": "srgb",
+        "exif_orientation": 1,
+        "normalization_denominator": 255.0,
+        "orientation_convention": "exif_transposed",
+        "oriented_shape": [
+          64,
+          64,
+          3
+        ],
+        "original_shape": [
+          64,
+          64,
+          3
+        ],
+        "path": "/workspace/scratch/617f8bd555c4/FroneCamera-implementation/evidence/build/task-1-example/candidate-local-collapse.png",
+        "source_bytes_sha256": "a1f6ff0900de6733f910f891970ed781f663e4b999540055df621fe493f9a0a3",
+        "warnings": []
+      },
+      {
+        "asset_id": "source",
+        "bit_depth": 64,
+        "byte_count": 98432,
+        "declared_source_sha256": null,
+        "decoded_pixels_sha256": "72ba20e6d71febd0b243ec4fc350b9be9662a6cdbbdd9584306fc5a634fabdde",
+        "decoder": "numpy_safe",
+        "dtype": "float64",
+        "encoding": "linear",
+        "exif_orientation": 1,
+        "normalization_denominator": 1.0,
+        "orientation_convention": "exif_transposed",
+        "oriented_shape": [
+          64,
+          64,
+          3
+        ],
+        "original_shape": [
+          64,
+          64,
+          3
+        ],
+        "path": "/workspace/scratch/617f8bd555c4/FroneCamera-implementation/evidence/build/task-1-example/source.npy",
+        "source_bytes_sha256": "5605e818472b94d1d06efb727b0e002cbfd28bcbba71b8c7a5546368ed65ace6",
+        "warnings": []
+      }
+    ],
+    "request_sha256": "1e595d5e72e2bb085c3adabc5a5f9d3f905e5002d857dbaba2aba121158caac0",
+    "roi_coordinate_convention": "oriented_baseline_pixels",
+    "split": "audit"
+  },
+  "mode": "algorithm",
+  "scene_id": "reproducible-array-fixture",
+  "schema_version": "iqa-comparison/1",
+  "warnings": [
+    "measurements_are_uncalibrated_proxies_not_absolute_quality",
+    "single_comparison_does_not_measure_controllability",
+    "highlight_threshold_occupancy_is_not_proof_of_sensor_clipping"
+  ]
+}

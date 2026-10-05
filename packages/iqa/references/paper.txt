@@ -1,0 +1,14 @@
+ControlLight: Towards Controllable, Consistent, and Generalizable Low-Light Enhancement
+
+
+score model
+fine-grained image quality assessment for perceptual image restoration
+
+
+TM model
+Modular Neural Image Signal Processing
+
+VLLM for image Restoration
+GGT-100K: Generative Ground Truth for Generalizable Real-World Image Restoration
+BeautyGRPO: Aesthetic Alignment for Face Retouching via Dynamic Path Guidance and Fine-Grained Preference Modeling
+SmartPhotoCrafter: Unified Reasoning, Generation and Optimization for Automatic Photographic Image Editing
