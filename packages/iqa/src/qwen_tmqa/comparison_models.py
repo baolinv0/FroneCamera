@@ -47,8 +47,16 @@ class ComparisonAsset(StrictModel):
     id: str = Field(min_length=1)
     path: Path
     encoding: Literal["srgb", "linear"] = "srgb"
+    # Shared algorithm callers retain declared encoding. Front opts into ICC handling.
+    color_policy: Literal["declared", "embedded_to_srgb"] = "declared"
     # User assertion bound to bytes, not independent proof of a processing pipeline.
     source_sha256: str | None = Field(default=None, pattern=r"^[0-9a-f]{64}$")
+
+    @model_validator(mode="after")
+    def color_policy_encoding(self):
+        if self.color_policy == "embedded_to_srgb" and self.encoding != "srgb":
+            raise ValueError("embedded_to_srgb requires srgb output encoding")
+        return self
 
     @field_validator("id")
     @classmethod

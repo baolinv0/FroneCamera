@@ -144,6 +144,11 @@ def render_report_bundle(
     output_dir.mkdir(parents=True, exist_ok=True)
     stem = f"{status}-v{version}"
     payload = _materialize_visual_assets(payload, output_dir)
+    # Source locations are needed only until the immutable visual assets exist.
+    # Every format receives the same recursively sanitized publication payload.
+    from portrait_eval.exporting import sanitize_export
+
+    payload = ReportPayload.model_validate(sanitize_export(payload.model_dump(mode="json")))
     from portrait_eval.report_projection import publication_notes
 
     payload = payload.model_copy(update={"provenance_notes": publication_notes(payload)})

@@ -4,7 +4,7 @@ from pathlib import Path
 from typing import Any, cast
 from uuid import uuid4
 
-from sqlalchemy import delete, select
+from sqlalchemy import delete, select, update
 from sqlalchemy.orm import Session
 
 from portrait_eval.database import (
@@ -341,6 +341,13 @@ class Repository:
     def create_review_item(
         self, project_id: str, category: str, payload: object, priority: str = "medium"
     ) -> ReviewItemRow:
+        # Publication's final gate and review mutations use the same short lock.
+        self.session.execute(
+            update(ProjectRow)
+            .where(ProjectRow.id == project_id)
+            .values(version=ProjectRow.version)
+            .execution_options(synchronize_session=False)
+        )
         row = ReviewItemRow(
             project_id=project_id,
             category=category,
@@ -372,6 +379,12 @@ class Repository:
         row = self.session.get(ReviewItemRow, review_id)
         if row is None:
             raise KeyError(review_id)
+        self.session.execute(
+            update(ProjectRow)
+            .where(ProjectRow.id == row.project_id)
+            .values(version=ProjectRow.version)
+            .execution_options(synchronize_session=False)
+        )
         payload = cast(dict[str, Any], json_load(row.payload_json))
         if note:
             payload["review_note"] = note

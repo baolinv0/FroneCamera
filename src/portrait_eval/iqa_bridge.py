@@ -21,7 +21,12 @@ def evaluate_scene(
         }
     ordered = sorted(image_paths)
     assets = [
-        ComparisonAsset(id=device_id, path=str(image_paths[device_id]), encoding="srgb")
+        ComparisonAsset(
+            id=device_id,
+            path=str(image_paths[device_id]),
+            encoding="srgb",
+            color_policy="embedded_to_srgb",
+        )
         for device_id in ordered
     ]
     rois = []
@@ -77,11 +82,20 @@ def scene_evidence_audit(evidence: dict[str, Any], device_ids: list[str]) -> dic
     ]
     if fatal_reasons:
         warnings.append("iqa_fatal_comparison_evidence")
+    color_warnings = list(
+        dict.fromkeys(
+            warning
+            for asset in assets
+            for warning in asset.get("trace", {}).get("warnings", [])
+            if _is_color_warning(warning)
+        )
+    )
     return {
         "valid": len(device_ids) >= 2 and not warnings,
         "invalid_asset_ids": invalid_ids,
         "fatal_reasons": fatal_reasons,
         "warnings": warnings,
+        "color_warnings": color_warnings,
     }
 
 
@@ -106,6 +120,10 @@ def dimension_evidence(evidence: dict[str, Any], device_id: str, dimension: str)
     )
 
 
+def _is_color_warning(warning: str) -> bool:
+    return warning.startswith(("embedded_", "unprofiled_color_"))
+
+
 def model_evidence_context(evidence: dict[str, Any], *, measurements: bool) -> dict[str, Any]:
     """Expose core applicability to blind passes; measured facts to validation passes."""
     assets = []
@@ -124,6 +142,11 @@ def model_evidence_context(evidence: dict[str, Any], *, measurements: bool) -> d
             "state": asset.get("state"),
             "dimensions": dimensions,
             "reasons": asset.get("reasons", []),
+            "color_warnings": [
+                warning
+                for warning in asset.get("trace", {}).get("warnings", [])
+                if _is_color_warning(warning)
+            ],
         }
         if measurements:
             payload["objective"] = asset.get("objective", {})
@@ -131,6 +154,13 @@ def model_evidence_context(evidence: dict[str, Any], *, measurements: bool) -> d
     return {
         "mode": evidence.get("mode"),
         "assets": assets,
-        "warnings": evidence.get("warnings", []),
+        "warnings": list(
+            dict.fromkeys(
+                [
+                    *evidence.get("warnings", []),
+                    *(warning for asset in assets for warning in asset["color_warnings"]),
+                ]
+            )
+        ),
         "scope": "measured_photometric_proxies_and_explicit_missing_evidence",
     }

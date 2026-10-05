@@ -6,14 +6,14 @@ from pathlib import Path
 from typing import Any
 from uuid import uuid4
 
-from sqlalchemy import delete, select
+from sqlalchemy import delete, update
 from sqlalchemy.orm import Session
 
 from portrait_eval.adjudication import adjudicate_claim, stable_claim_id
 from portrait_eval.attribution import attribute_output_claim
 from portrait_eval.bias import assess_capture_bias
 from portrait_eval.corroboration import CorroborationAdapter, HeuristicCorroborationAdapter
-from portrait_eval.database import AnalysisRow, ReportRow, ReviewItemRow
+from portrait_eval.database import AnalysisRow, ProjectRow, ReportRow, ReviewItemRow
 from portrait_eval.hardware import build_hardware_queries
 from portrait_eval.imaging import analyze_image, audit_scene
 from portrait_eval.iqa_bridge import (
@@ -41,6 +41,7 @@ from portrait_eval.research import (
     build_corroboration_queries,
     grade_source,
 )
+from portrait_eval.run_binding import validate_run_binding
 from portrait_eval.strategy import infer_cross_scene_claims
 from portrait_eval.vlm import HeuristicVisionAdapter, VisionModelAdapter, adapter_identity
 
@@ -87,6 +88,35 @@ def _restore_device_ids(
     return result.model_copy(update={"observations": observations})
 
 
+class _EvaluationRepository(Repository):
+    """Track only output rows created through this evaluator's repository."""
+
+    def __init__(self, session: Session) -> None:
+        super().__init__(session)
+        self.created_ids: dict[type[Any], set[str]] = {
+            model: set() for model in (AnalysisRow, ReviewItemRow, ReportRow)
+        }
+
+    def save_analysis(
+        self,
+        project_id: str,
+        kind: str,
+        payload: object,
+        scene_group_id: str | None = None,
+        image_id: str | None = None,
+    ) -> AnalysisRow:
+        row = super().save_analysis(project_id, kind, payload, scene_group_id, image_id)
+        self.created_ids[AnalysisRow].add(row.id)
+        return row
+
+    def create_review_item(
+        self, project_id: str, category: str, payload: object, priority: str = "medium"
+    ) -> ReviewItemRow:
+        row = super().create_review_item(project_id, category, payload, priority)
+        self.created_ids[ReviewItemRow].add(row.id)
+        return row
+
+
 class EvaluationPipeline:
     def __init__(
         self,
@@ -98,7 +128,7 @@ class EvaluationPipeline:
         corroborator: CorroborationAdapter | None = None,
     ) -> None:
         self.session = session
-        self.repo = Repository(session)
+        self.repo = _EvaluationRepository(session)
         self.workspace = workspace
         self.primary = primary or HeuristicVisionAdapter("primary")
         self.reviewer = reviewer or HeuristicVisionAdapter("reviewer")
@@ -139,10 +169,8 @@ class EvaluationPipeline:
                             "Source bytes changed since scan; re-scan and confirm pairing"
                         )
                     checksums[cell["image_id"]] = checksum
-        before = {
-            model: set(self.session.scalars(select(model.id).where(model.project_id == project_id)))
-            for model in (AnalysisRow, ReviewItemRow, ReportRow)
-        }
+        for ids in self.repo.created_ids.values():
+            ids.clear()
         self.run_binding = {
             "attempt_id": str(uuid4()),
             "pairing_snapshot_id": snapshot["id"],
@@ -161,12 +189,20 @@ class EvaluationPipeline:
         except Exception as exc:
             self.session.rollback()
             # Partial outputs must not look like a successful run, or leak into a retry.
-            for model, ids in before.items():
-                self.session.execute(
-                    delete(model).where(model.project_id == project_id, model.id.not_in(ids))
+            for model, ids in self.repo.created_ids.items():
+                if ids:
+                    self.session.execute(
+                        delete(model).where(model.project_id == project_id, model.id.in_(ids))
+                    )
+            # A stale worker must not replace the user's new pairing-required state.
+            self.session.execute(
+                update(ProjectRow)
+                .where(
+                    ProjectRow.id == project_id,
+                    ProjectRow.version == self.run_binding["pairing_version"],
                 )
-            project = self.repo.get_project(project_id)
-            project.status = ProjectStatus.FAILED.value
+                .values(status=ProjectStatus.FAILED.value)
+            )
             self.session.commit()
             self.repo.save_analysis(
                 project_id,
@@ -211,7 +247,7 @@ class EvaluationPipeline:
 
     def _run_confirmed(self, project_id: str, pairing: dict[str, Any]) -> dict[str, Any]:
         project = self.repo.get_project(project_id)
-        project.status = ProjectStatus.ANALYZING.value
+        self._set_run_status(project_id, ProjectStatus.ANALYZING.value)
         self.session.commit()
         scene_results: list[dict[str, Any]] = []
         all_findings: list[dict[str, Any]] = []
@@ -407,21 +443,7 @@ class EvaluationPipeline:
                 }
             )
 
-        # Bind the reported model/measurement outputs to the same bytes, including
-        # mutations that occur after the initial scan verification.
-        for group in pairing["groups"]:
-            for cell in group["cells"].values():
-                if (
-                    cell
-                    and hashlib.sha256(Path(cell["path"]).read_bytes()).hexdigest()
-                    != cell["checksum"]
-                ):
-                    raise ValueError(
-                        "Source bytes changed during evaluation; re-scan and confirm pairing"
-                    )
-        self.session.refresh(project)
-        if project.version != self.run_binding["pairing_version"]:
-            raise ValueError("Pairing changed during evaluation; confirm the new pairing snapshot")
+        validate_run_binding(self.repo, project_id, self.run_binding)
         strategy_claims = infer_cross_scene_claims(scene_results)
         for claim in strategy_claims:
             finding = claim.model_dump(mode="json")
@@ -621,25 +643,50 @@ class EvaluationPipeline:
             ],
         )
         report_dir = self.workspace / "projects" / project_id / "reports"
+        validate_run_binding(self.repo, project_id, self.run_binding)
         bundle = render_report_bundle(report_payload, report_dir, version="0.1", status="draft")
-        self.repo.save_report(project_id, "0.1", "draft", str(bundle["html"]))
         review_count = len(
             [item for item in self.repo.list_review_items(project_id) if item["status"] == "open"]
         )
-        project.status = (
+        status = (
             ProjectStatus.HUMAN_REVIEW_REQUIRED.value
             if review_count
             else ProjectStatus.REPORT_DRAFT_READY.value
         )
+        validate_run_binding(self.repo, project_id, self.run_binding)
+        self._set_run_status(project_id, status)
+        # Publish the draft row and its project state in the same transaction.
+        draft = ReportRow(
+            id=str(uuid4()),
+            project_id=project_id,
+            version="0.1",
+            status="draft",
+            html_path=str(bundle["html"]),
+        )
+        self.repo.created_ids[ReportRow].add(draft.id)
+        self.session.add(draft)
         self.session.commit()
         return {
-            "status": project.status,
+            "status": status,
             "report_path": str(bundle["html"]),
             "json_path": str(bundle["json"]),
             "csv_path": str(bundle["csv"]),
             "scene_count": len(scene_results),
             "review_items": review_count,
         }
+
+    def _set_run_status(self, project_id: str, status: str) -> None:
+        changed = self.session.execute(
+            update(ProjectRow)
+            .where(
+                ProjectRow.id == project_id,
+                ProjectRow.version == self.run_binding["pairing_version"],
+            )
+            .values(status=status)
+            .returning(ProjectRow.id)
+        ).scalar_one_or_none()
+        if changed is None:
+            raise ValueError("Pairing changed during evaluation; confirm the new pairing snapshot")
 
     def _adjudicate_scene(
         self,

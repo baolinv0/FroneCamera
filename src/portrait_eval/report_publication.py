@@ -7,10 +7,11 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
-from sqlalchemy import func, select
+from sqlalchemy import func, select, update
 from sqlalchemy.exc import IntegrityError, OperationalError
 
-from portrait_eval.database import ReportPublicationRow, ReportRow
+from portrait_eval.database import ProjectRow, ReportPublicationRow, ReportRow
+from portrait_eval.report_projection import resolve_report_payload
 from portrait_eval.reporting import ReportPayload
 from portrait_eval.repository import Repository
 
@@ -57,9 +58,14 @@ def publish_final_report(
     source: Path,
     renderer: Callable[[ReportPayload, Path, str, str], dict[str, Path]],
 ) -> dict[str, Any]:
+    project = repo.get_project(project_id)
+    expected_version, expected_status = project.version, project.status
     allocation = reserve_publication(repo, project_id)
     publication_id = allocation.id
     version = f"1.{allocation.ordinal}"
+    created_at = allocation.created_at
+    # Release the allocation/read transaction before invoking the slow renderer.
+    repo.session.rollback()
     staging = source.parent / ".publication-staging" / publication_id
     destination = source.parent / "publications" / publication_id
     committed = False
@@ -80,6 +86,53 @@ def publish_final_report(
         for path in bundle.values():
             path.resolve().relative_to(staging.resolve())
         relative_html = bundle["html"].resolve().relative_to(staging.resolve())
+        # Discard any old read snapshot and acquire the writer lock before the
+        # final review gate. Review writers share this project lock; SQLite also
+        # serializes all writes. Rendering never holds it.
+        repo.session.rollback()
+        guard = repo.session.execute(
+            update(ProjectRow)
+            .where(
+                ProjectRow.id == project_id,
+                ProjectRow.version == expected_version,
+                ProjectRow.status.in_([expected_status, "REPORT_FINALIZED"]),
+            )
+            .values(version=ProjectRow.version)
+            .returning(ProjectRow.id)
+            .execution_options(synchronize_session=False)
+        ).scalar_one_or_none()
+        if guard is None:
+            raise PublicationConflict("Project pairing or state changed during publication")
+        reviews = repo.list_review_items(project_id)
+        mode = payload.evaluation_mode or "professional"
+        if mode != "quick" and any(item["status"] == "open" for item in reviews):
+            raise PublicationConflict("Resolve all review items before finalizing")
+        # An older conservative projection stays safe when a rejection is later
+        # approved. Newly denied evidence must not remain in the rendered payload.
+        try:
+            baseline = resolve_report_payload(payload, [], mode).model_dump(mode="json")
+            current = resolve_report_payload(payload, reviews, mode).model_dump(mode="json")
+        except ValueError as exc:
+            raise PublicationConflict(
+                f"Publication cannot resolve current evidence: {exc}"
+            ) from exc
+        baseline.pop("review_summary", None)
+        current.pop("review_summary", None)
+        # Quick publications retain their explicit original open-review disclosure.
+        baseline.pop("limitations", None)
+        current.pop("limitations", None)
+        if baseline != current:
+            raise PublicationConflict(
+                "Review decisions changed supporting evidence during publication"
+            )
+        binding = payload.input_trace.get("run_binding")
+        if binding is not None:
+            from portrait_eval.run_binding import validate_run_binding
+
+            try:
+                validate_run_binding(repo, project_id, binding)
+            except ValueError as exc:
+                raise PublicationConflict(f"Report source binding changed: {exc}") from exc
         destination.parent.mkdir(parents=True, exist_ok=True)
         staging.rename(destination)
         row = ReportRow(
@@ -87,10 +140,13 @@ def publish_final_report(
             version=version,
             status="final",
             html_path=str(destination / relative_html),
-            created_at=allocation.created_at,
+            created_at=created_at,
         )
         repo.session.add(row)
-        allocation.status = "published"
+        published_allocation = repo.session.get(ReportPublicationRow, publication_id)
+        if published_allocation is None:
+            raise PublicationConflict("Report publication reservation no longer exists")
+        published_allocation.status = "published"
         repo.get_project(project_id).status = "REPORT_FINALIZED"
         # Conventional sessions expire ORM attributes after commit. Freeze the
         # response while reads are still part of the precommit transaction.

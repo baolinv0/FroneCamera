@@ -11,7 +11,11 @@ from qwen_tmqa.comparison_models import ComparisonAsset
 
 
 def load_normalized_rgb(path: Path) -> tuple[np.ndarray, dict[str, Any]]:
-    asset = load_comparison_asset(ComparisonAsset(id="front-image", path=path, encoding="srgb"))
+    asset = load_comparison_asset(
+        ComparisonAsset(
+            id="front-image", path=path, encoding="srgb", color_policy="embedded_to_srgb"
+        )
+    )
     return asset.pixels, asset.trace
 
 

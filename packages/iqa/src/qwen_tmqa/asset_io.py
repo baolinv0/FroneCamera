@@ -4,13 +4,14 @@ from __future__ import annotations
 
 import hashlib
 import io
+import math
 import struct
 from dataclasses import dataclass
 
 import cv2
 import numpy as np
 import pillow_heif
-from PIL import Image, UnidentifiedImageError
+from PIL import Image, ImageCms, UnidentifiedImageError
 
 from .comparison_models import ComparisonAsset
 
@@ -47,6 +48,81 @@ class AssetDecodeError(ValueError):
         self.trace = trace
 
 
+# Includes raw/expanded channels and normalization/orientation/hash temporaries.
+# This is an allocation safety limit per NPY asset, not a pixel quality threshold.
+NUMPY_DECODE_MEMORY_BUDGET_BYTES = 512 * 1024 * 1024
+
+
+def _validate_pixel_layout(shape: tuple[int, ...], dtype: np.dtype) -> None:
+    if (
+        len(shape) not in (2, 3)
+        or any(type(n) is not int or n <= 0 for n in shape)
+        or (len(shape) == 3 and shape[2] not in (3, 4))
+    ):
+        raise ValueError("image_requires_nonempty_gray_or_rgb")
+    if dtype.kind not in ("u", "f") or dtype.itemsize > 8:
+        raise ValueError("unsupported_pixel_dtype")
+    if dtype.kind == "u" and dtype.itemsize not in (1, 2):
+        raise ValueError("unsupported_integer_precision")
+
+
+def _preflight_numpy(data: bytes, trace: dict[str, object]) -> None:
+    """Read the bounded header, reject unsafe dimensions and missing payload first."""
+    stream = io.BytesIO(data)
+    version = np.lib.format.read_magic(stream)
+    if version not in ((1, 0), (2, 0), (3, 0)):
+        raise ValueError("unsupported_numpy_header_version")
+    # Supported scalar numeric dtypes have ASCII descriptors even in v3 headers;
+    # structured/unicode dtypes are refused below. Use only public NumPy readers.
+    reader = (
+        np.lib.format.read_array_header_1_0
+        if version == (1, 0)
+        else np.lib.format.read_array_header_2_0
+    )
+    shape, _fortran, dtype = reader(stream, max_header_size=10000)
+    trace.update(
+        {
+            "raw_shape": list(shape),
+            "dtype": str(dtype),
+            "numpy_memory_budget_bytes": NUMPY_DECODE_MEMORY_BUDGET_BYTES,
+        }
+    )
+    _validate_pixel_layout(shape, dtype)
+    raw_bytes = math.prod(shape) * dtype.itemsize
+    height, width = shape[:2]
+    expanded_raw_bytes = height * width * 3 * dtype.itemsize if len(shape) == 2 else raw_bytes
+    predicted_bytes = raw_bytes + expanded_raw_bytes + height * width * 3 * 8 * 3
+    trace["numpy_predicted_decode_bytes"] = predicted_bytes
+    if predicted_bytes > NUMPY_DECODE_MEMORY_BUDGET_BYTES:
+        raise ValueError("numpy_decode_memory_budget_exceeded")
+    if len(data) - stream.tell() != raw_bytes:
+        raise ValueError("numpy_payload_length_mismatch")
+
+
+def _normalize_embedded_icc(raw: np.ndarray, profile: bytes, warnings: list[str]) -> np.ndarray:
+    # Pillow/LittleCMS RGB transforms are 8-bit only. Refuse higher precision rather
+    # than dropping meaningful samples. The declared path never invokes this conversion.
+    if raw.dtype != np.uint8:
+        warnings.append("embedded_icc_precision_unsupported")
+        raise ValueError("embedded_icc_precision_unsupported")
+    try:
+        source = ImageCms.ImageCmsProfile(io.BytesIO(profile))
+        target = ImageCms.createProfile("sRGB")
+        mode = "L" if raw.ndim == 2 else "RGBA" if raw.shape[2] == 4 else "RGB"
+        converted = ImageCms.profileToProfile(
+            Image.fromarray(raw), source, target, outputMode="RGB"
+        )
+        result = np.asarray(converted).copy()
+        # Opaque-alpha validation still runs on source values below.
+        if mode == "RGBA":
+            result = np.concatenate((result, raw[..., 3:4]), axis=2)
+    except (ImageCms.PyCMSError, ValueError, OSError, TypeError) as exc:
+        warnings.append("embedded_icc_normalization_failed")
+        raise ValueError("embedded_icc_normalization_failed") from exc
+    warnings.append("embedded_icc_transformed_to_srgb")
+    return result
+
+
 def load_comparison_asset(asset: ComparisonAsset) -> LoadedComparisonAsset:
     data = asset.path.read_bytes()
     trace: dict[str, object] = {
@@ -55,6 +131,7 @@ def load_comparison_asset(asset: ComparisonAsset) -> LoadedComparisonAsset:
         "source_bytes_sha256": hashlib.sha256(data).hexdigest(),
         "byte_count": len(data),
         "encoding": asset.encoding,
+        "color_policy": asset.color_policy,
         "declared_source_sha256": asset.source_sha256,
     }
     try:
@@ -124,7 +201,12 @@ def _decode(asset: ComparisonAsset, data: bytes, trace: dict[str, object]) -> Lo
     native_orientation = False
     source_bit_depth = None
     warnings: list[str] = []
+    trace["warnings"] = warnings
+    icc_profile = None
+    icc_profile_present = False
+    heif_color_profile = None
     if asset.path.suffix.lower() == ".npy":
+        _preflight_numpy(data, trace)
         raw = np.load(io.BytesIO(data), allow_pickle=False)
         decoder = "numpy_safe"
         if not isinstance(raw, np.ndarray):
@@ -142,14 +224,19 @@ def _decode(asset: ComparisonAsset, data: bytes, trace: dict[str, object]) -> Lo
             exif = Image.Exif()
             exif.load(exif_data)
             orientation = int(exif.get(274, 1))
-        if heif.info.get("icc_profile") or heif.info.get("nclx_profile"):
+        icc_profile = heif.info.get("icc_profile")
+        icc_profile_present = "icc_profile" in heif.info
+        heif_color_profile = heif.info.get("nclx_profile")
+        if asset.color_policy == "declared" and (icc_profile or heif_color_profile):
             warnings.append("embedded_heif_color_profile_not_applied_declared_encoding_used")
         warnings.append("heif_container_orientation_applied_by_native_decoder_exif_not_reapplied")
     else:
         try:
             with Image.open(io.BytesIO(data)) as image:
                 orientation = int(image.getexif().get(274, 1))
-                if image.info.get("icc_profile"):
+                icc_profile = image.info.get("icc_profile")
+                icc_profile_present = "icc_profile" in image.info
+                if icc_profile and asset.color_policy == "declared":
                     warnings.append("embedded_icc_not_applied_declared_encoding_used")
         except (UnidentifiedImageError, OSError):
             pass  # OpenCV also supports HDR formats unsupported by Pillow.
@@ -173,6 +260,35 @@ def _decode(asset: ComparisonAsset, data: bytes, trace: dict[str, object]) -> Lo
     )
     if orientation not in range(1, 9):
         raise ValueError("unsupported_exif_orientation")
+    _validate_pixel_layout(raw.shape, raw.dtype)
+    if asset.color_policy == "embedded_to_srgb":
+        # Pillow keeps the ICC key with None for corrupt compression and b'' for
+        # an empty profile. Neither is an unprofiled source or safe sRGB evidence.
+        if icc_profile_present and not icc_profile:
+            warnings.append("embedded_icc_normalization_failed")
+            raise ValueError("embedded_icc_normalization_failed")
+        if icc_profile and heif_color_profile:
+            warnings.append("embedded_heif_multiple_color_profiles_unsupported")
+            raise ValueError("embedded_heif_multiple_color_profiles_unsupported")
+        if icc_profile:
+            raw = _normalize_embedded_icc(raw, icc_profile, warnings)
+            decoder += "_icc_to_srgb"
+        elif heif_color_profile:
+            # libheif already converts the known YCbCr matrix and range to RGB.
+            # BT.709 primaries + IEC 61966-2-1 transfer are exactly sRGB, so no
+            # precision-losing ICC round trip is needed (including 10/12-bit).
+            if (
+                heif_color_profile.get("color_primaries") == 1
+                and heif_color_profile.get("transfer_characteristics") == 13
+                and heif_color_profile.get("matrix_coefficients") in (0, 1, 6)
+                and heif_color_profile.get("full_range_flag") in (0, 1)
+            ):
+                warnings.append("embedded_heif_srgb_native_rgb")
+            else:
+                warnings.append("embedded_heif_color_normalization_unsupported")
+                raise ValueError("embedded_heif_color_normalization_unsupported")
+        else:
+            warnings.append("unprofiled_color_assumed_srgb")
     if raw.ndim == 2:
         raw = np.repeat(raw[..., None], 3, axis=2)
     if raw.ndim != 3 or raw.shape[2] not in (3, 4) or min(raw.shape[:2]) == 0:
@@ -209,6 +325,7 @@ def _decode(asset: ComparisonAsset, data: bytes, trace: dict[str, object]) -> Lo
             "bit_depth": np.dtype(dtype).itemsize * 8,
             "source_bit_depth": source_bit_depth or np.dtype(dtype).itemsize * 8,
             "encoding": asset.encoding,
+            "color_policy": asset.color_policy,
             "normalization_denominator": denominator,
             "original_shape": original_shape,
             "oriented_shape": list(pixels.shape),

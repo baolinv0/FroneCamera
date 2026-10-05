@@ -221,9 +221,13 @@ def propose_pairing(scans: Iterable[DeviceScan]) -> PairingDraft:
         strong_mapping = _strong_order_mapping(scan, len(reference.files))
         if strong_mapping is not None and strong_mapping[2] == "explicit_numeric_ordinal":
             # Numeric positions are strong only when the reference declares 1..N too.
-            reference_ordinals = [path.stem for path in reference.files]
-            if reference_ordinals != [str(index + 1) for index in range(len(reference.files))]:
+            reference_ordinals = [
+                int(path.stem) if re.fullmatch(r"\d+", path.stem) else None
+                for path in reference.files
+            ]
+            if reference_ordinals != list(range(1, len(reference.files) + 1)):
                 strong_mapping = None
+        content_conflicts: set[int] = set()
         if strong_mapping is not None:
             mapping, confidences, strategy = strong_mapping
             # Explicit ordering remains the proposed map, but content contradiction
@@ -235,14 +239,17 @@ def propose_pairing(scans: Iterable[DeviceScan]) -> PairingDraft:
                 )
                 if distance is not None and distance > 0.35:
                     confidences[ref_index] = 0.25
-                    strategy += ":content_conflict"
+                    content_conflicts.add(ref_index)
         else:
             mapping, confidences = _align_to_reference(reference, scan, feature_cache)
             strategy = "content_sequence_alignment"
         for ref_index, candidate_index in mapping.items():
             cells_by_group[ref_index][scan.device_id] = scan.files[candidate_index]
             confidence_by_group[ref_index].append(confidences[ref_index])
-            strategies_by_group[ref_index].append(f"{scan.device_id}:{strategy}")
+            group_strategy = strategy
+            if ref_index in content_conflicts:
+                group_strategy += ":content_conflict"
+            strategies_by_group[ref_index].append(f"{scan.device_id}:{group_strategy}")
 
     groups = []
     for index in cells_by_group_ids:
@@ -250,7 +257,7 @@ def propose_pairing(scans: Iterable[DeviceScan]) -> PairingDraft:
         missing = [device_id for device_id, path in cells.items() if path is None]
         confidence_values = confidence_by_group[index]
         confidence = round(float(np.median(confidence_values)), 3) if confidence_values else None
-        low_confidence = confidence is None or confidence < 0.55
+        low_confidence = not confidence_values or any(value < 0.55 for value in confidence_values)
         notes = [f"reference_device={reference.device_id}", *strategies_by_group[index]]
         if missing:
             notes.append(f"missing_devices={','.join(missing)}")

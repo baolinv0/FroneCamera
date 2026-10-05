@@ -13,12 +13,27 @@ REJECTED = {"rejected", "insufficient_evidence"}
 
 
 def _claim_ids(item: dict[str, Any]) -> set[str]:
-    ids = item.get("claim_ids") or item.get("supporting_claim_ids") or []
-    if isinstance(ids, str):
-        ids = [ids]
-    return {str(value) for value in ids} | (
-        {str(item["claim_id"])} if item.get("claim_id") else set()
-    )
+    """Return the claim's identity and every supporting dependency for filtering."""
+    ids = {str(item["claim_id"])} if item.get("claim_id") else set()
+    for field in ("claim_ids", "supporting_claim_ids", "source_claim_ids"):
+        values = item.get(field) or []
+        if isinstance(values, str):
+            values = [values]
+        ids.update(str(value) for value in values)
+    return ids
+
+
+def _review_target_ids(item: dict[str, Any]) -> set[str]:
+    """A full claim targets its own identity; legacy ID lists explicitly target claims."""
+    if item.get("claim_id"):
+        return {str(item["claim_id"])}
+    ids: set[str] = set()
+    for field in ("claim_ids", "supporting_claim_ids"):
+        values = item.get(field) or []
+        if isinstance(values, str):
+            values = [values]
+        ids.update(str(value) for value in values)
+    return ids
 
 
 def publication_notes(payload: ReportPayload) -> list[str]:
@@ -143,15 +158,15 @@ def resolve_report_payload(
         item = review.get("payload")
         if not isinstance(item, dict):
             continue
-        denied_ids.update(_claim_ids(item))
+        denied_ids.update(_review_target_ids(item))
         observation = item.get("primary_observation", item)
         if isinstance(observation, dict):
-            denied_ids.update(_claim_ids(observation))
+            denied_ids.update(_review_target_ids(observation))
             target = dict(observation)
             if item.get("group_id"):
                 target.setdefault("group_id", item["group_id"])
             if target.get("statement") or target.get("claim_statement"):
-                ids = _claim_ids(item) | _claim_ids(observation)
+                ids = _review_target_ids(item) | _review_target_ids(observation)
                 if ids:
                     target["claim_ids"] = sorted(ids)
                     target["_stable"] = True
@@ -231,6 +246,23 @@ def resolve_report_payload(
                 continue
             return True
         return False
+
+    def rejected_identities(value: Any, scene: str | None = None) -> set[str]:
+        """Translate scoped legacy denials to IDs, then follow derived dependencies."""
+        if isinstance(value, list):
+            return set().union(*(rejected_identities(item, scene) for item in value))
+        if not isinstance(value, dict):
+            return set()
+        scene = value.get("group_id") or value.get("scene_id") or scene
+        ids = (
+            {str(value["claim_id"])} if value.get("claim_id") and rejected(value, scene) else set()
+        )
+        return ids | set().union(*(rejected_identities(item, scene) for item in value.values()))
+
+    # Rejecting a derived claim never rejects its otherwise approved sources.
+    # Only the rejected object's own identity propagates to its dependents.
+    while new_ids := rejected_identities(data) - denied_ids:
+        denied_ids.update(new_ids)
 
     def clean(value: Any, scene: str | None = None) -> Any:
         if isinstance(value, list):

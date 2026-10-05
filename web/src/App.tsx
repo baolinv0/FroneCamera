@@ -54,9 +54,10 @@ export default function App() {
 
   async function create(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    const data = new FormData(event.currentTarget)
+    const form = event.currentTarget
+    const data = new FormData(form)
     const project = await api.createProject(String(data.get('name')))
-    event.currentTarget.reset()
+    form.reset()
     await refreshProjects()
     await open(project)
   }
@@ -64,14 +65,15 @@ export default function App() {
   async function addDevice(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     if (!current) return
-    const data = new FormData(event.currentTarget)
+    const form = event.currentTarget
+    const data = new FormData(form)
     await api.addDevice(current.id, {
       name: String(data.get('name')),
       folder_path: String(data.get('folder')),
       canonical_model: String(data.get('model') || '') || undefined
     })
     setMessage('Device registered. Add the remaining devices, then scan the folders.')
-    event.currentTarget.reset()
+    form.reset()
     await refreshProject(current.id)
   }
 
