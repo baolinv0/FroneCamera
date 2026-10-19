@@ -87,3 +87,9 @@ Linux 中文导出需要 Noto Sans CJK 等实际可用字体。模型输入超�
 - 保持 0.1 兼容并扩展实际运行契约 0.2；代价是完整严格 v2 迁移仍需后续工作。
 - final 保留为文件归档状态，始终显示模型辅助、人工验证待完成；旧调用方需区分文档状态与验证状态。
 - 真实数据、人审和校准结果缺失时不补写成功，后续仍须完成 T14–T25。
+
+## 构建可重复性补充
+
+GitHub 首次前端作业在 Node 22 自带 npm 10 的依赖解析阶段出现 `edgesOut` 异常，后端作业已通过。本轮把 CI 与前端 Docker 构建统一到本地已验证的 Node 24，提交来自 npm 公共仓库、包含完整 integrity 的 lockfile，并改用 `npm ci`；安装日志也纳入 CI 产物。新的干净安装、3 项测试和构建已在本地通过。Docker 镜像构建未在当前环境执行。
+
+提交审阅：[PR #6](https://github.com/baolinv0/FroneCamera/pull/6)，目标分支 `agent/openai-auto-pairing-final`。

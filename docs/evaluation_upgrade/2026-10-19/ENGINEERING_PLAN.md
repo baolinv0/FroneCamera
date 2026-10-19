@@ -54,4 +54,4 @@ Files: IMPLEMENTATION_RESULTS.md, docs/implementation-status.md, README.md.
 - [x] Run full pytest, ruff lint/format, mypy; record actual results.
 - [x] Obtain independent review and fix important findings with regression tests.
 - [x] Record checklist item states; keep T14-T25 data/human/experiment gates explicitly pending.
-- [ ] Push implementation branch and create PR against agent/openai-auto-pairing-final.
+- [x] Push implementation branch and create PR against agent/openai-auto-pairing-final: PR #6.
