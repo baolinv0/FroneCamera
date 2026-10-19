@@ -10,6 +10,11 @@ from fastapi.responses import FileResponse, HTMLResponse
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 
+from portrait_eval.annotations import (
+    SceneAnnotation,
+    latest_scene_annotation,
+    save_scene_annotation,
+)
 from portrait_eval.config import Settings
 from portrait_eval.corroboration import (
     CorroborationAdapter,
@@ -26,6 +31,8 @@ from portrait_eval.database import (
 )
 from portrait_eval.exporting import export_project
 from portrait_eval.pipeline import EvaluationPipeline
+from portrait_eval.report_assets import report_asset_path, served_report_html
+from portrait_eval.report_model import apply_review_decisions
 from portrait_eval.reporting import ReportPayload, render_pdf_report, render_report_bundle
 from portrait_eval.repository import Repository
 from portrait_eval.research import DisabledSearchProvider, SearchProvider, SearxNGSearchProvider
@@ -266,6 +273,36 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             except KeyError as exc:
                 raise HTTPException(status_code=404, detail="Task not found") from exc
 
+    @app.get(
+        "/api/projects/{project_id}/scenes/{group_key}/annotation",
+        dependencies=[Depends(authorize)],
+    )
+    def scene_annotation(
+        project_id: str, group_key: str, repo: Repository = Depends(repository)
+    ) -> dict[str, Any]:
+        try:
+            repo.get_project(project_id)
+            return latest_scene_annotation(repo, project_id, group_key)
+        except KeyError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+    @app.post(
+        "/api/projects/{project_id}/scenes/{group_key}/annotation",
+        dependencies=[Depends(authorize)],
+    )
+    def annotate_scene(
+        project_id: str,
+        group_key: str,
+        body: SceneAnnotation,
+        repo: Repository = Depends(repository),
+    ) -> dict[str, Any]:
+        try:
+            return save_scene_annotation(repo, project_id, group_key, body)
+        except RuntimeError as exc:
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
+        except (ValueError, KeyError) as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+
     @app.get("/api/projects/{project_id}/analysis", dependencies=[Depends(authorize)])
     def analysis(
         project_id: str,
@@ -326,7 +363,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         return repo.list_reports(project_id)
 
     @app.get("/api/projects/{project_id}/reports/latest", dependencies=[Depends(authorize)])
-    def latest_report(project_id: str, repo: Repository = Depends(repository)) -> FileResponse:
+    def latest_report(project_id: str, repo: Repository = Depends(repository)) -> HTMLResponse:
         row = repo.session.scalar(
             select(ReportRow)
             .where(ReportRow.project_id == project_id)
@@ -338,10 +375,13 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         workspace = settings.workspace.resolve()
         if workspace not in path.parents:
             raise HTTPException(status_code=403, detail="Invalid report path")
-        return FileResponse(path, media_type="text/html", filename=path.name)
+        return HTMLResponse(
+            served_report_html(path, f"/api/reports/{row.id}/assets/"),
+            headers={"Cache-Control": "private, no-store"},
+        )
 
     @app.get("/api/reports/{report_id}/html", dependencies=[Depends(authorize)])
-    def report_html(report_id: str, repo: Repository = Depends(repository)) -> FileResponse:
+    def report_html(report_id: str, repo: Repository = Depends(repository)) -> HTMLResponse:
         row = repo.session.get(ReportRow, report_id)
         if row is None:
             raise HTTPException(status_code=404, detail="Report not found")
@@ -349,7 +389,22 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         workspace = settings.workspace.resolve()
         if workspace not in html_path.parents or not html_path.is_file():
             raise HTTPException(status_code=403, detail="Invalid report path")
-        return FileResponse(html_path, media_type="text/html", filename=html_path.name)
+        return HTMLResponse(
+            served_report_html(html_path, f"/api/reports/{row.id}/assets/"),
+            headers={"Cache-Control": "private, no-store"},
+        )
+
+    @app.get("/api/reports/{report_id}/assets/{filename}", dependencies=[Depends(authorize)])
+    def report_image(
+        report_id: str, filename: str, repo: Repository = Depends(repository)
+    ) -> FileResponse:
+        row = repo.session.get(ReportRow, report_id)
+        if row is None:
+            raise HTTPException(status_code=404, detail="Report not found")
+        return FileResponse(
+            report_asset_path(Path(row.html_path).resolve(), filename, settings.workspace),
+            headers={"Cache-Control": "private, no-store"},
+        )
 
     @app.get("/api/reports/{report_id}/pdf", dependencies=[Depends(authorize)])
     def report_pdf(report_id: str, repo: Repository = Depends(repository)) -> FileResponse:
@@ -416,38 +471,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         if source_json.is_file():
             payload = ReportPayload.model_validate_json(source_json.read_text(encoding="utf-8"))
             resolved_reviews = repo.list_review_items(project_id)
-            rejected_statements = {
-                str(item["payload"].get("statement"))
-                for item in resolved_reviews
-                if item["status"] in {"rejected", "insufficient_evidence"}
-                and isinstance(item["payload"], dict)
-                and item["payload"].get("statement")
-            }
-            rejected_external = {
-                (
-                    str(item["payload"].get("url")),
-                    str(item["payload"].get("claim_statement")),
-                )
-                for item in resolved_reviews
-                if item["category"] == "external_corroboration_review"
-                and item["status"] in {"rejected", "insufficient_evidence"}
-                and isinstance(item["payload"], dict)
-            }
-            payload.findings = [
-                item
-                for item in payload.findings
-                if str(item.get("statement")) not in rejected_statements
-            ]
-            payload.attributions = [
-                item
-                for item in payload.attributions
-                if str(item.get("statement")) not in rejected_statements
-            ]
-            payload.external_validation = [
-                item
-                for item in payload.external_validation
-                if (str(item.get("url")), str(item.get("claim_statement"))) not in rejected_external
-            ]
+            payload = apply_review_decisions(payload, resolved_reviews)
             bundle = render_report_bundle(payload, source.parent, version, "final")
             destination = bundle["html"]
         else:

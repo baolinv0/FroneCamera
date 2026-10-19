@@ -157,6 +157,7 @@ class Repository:
                     if image is None
                     else {
                         "image_id": image.id,
+                        "checksum": image.checksum,
                         "filename": image.filename,
                         "path": image.path,
                         "width": image.width,
@@ -186,6 +187,7 @@ class Repository:
             available_images[device.id] = [
                 {
                     "image_id": image.id,
+                    "checksum": image.checksum,
                     "filename": image.filename,
                     "path": image.path,
                     "width": image.width,

@@ -1,19 +1,24 @@
 from __future__ import annotations
 
-import html
-import json
 import re
 import shutil
 from pathlib import Path
 from typing import Any
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 
 class ReportPayload(BaseModel):
     project_name: str
     devices: list[str]
     findings: list[dict[str, Any]]
+    schema_version: str = "0.1"
+    all_claims: list[dict[str, Any]] = Field(default_factory=list)
+    challenge_matrix: list[dict[str, Any]] = Field(default_factory=list)
+    coverage: dict[str, Any] = Field(default_factory=dict)
+    review_provenance: dict[str, Any] = Field(
+        default_factory=lambda: {"human_review": "pending", "calibration": "not_performed"}
+    )
     report_title: str | None = None
     report_subtitle: str | None = None
     scene_results: list[dict[str, Any]] = Field(default_factory=list)
@@ -27,59 +32,33 @@ class ReportPayload(BaseModel):
     capture_bias: list[dict[str, Any]] = Field(default_factory=list)
     limitations: list[str] = Field(default_factory=list)
 
+    @model_validator(mode="after")
+    def validate_claim_contract(self):
+        if self.schema_version == "0.2":
+            scene_ids = {scene["group_id"] for scene in self.scene_results}
+            for claim in self.findings + self.all_claims:
+                if (
+                    not claim.get("claim_id")
+                    or not claim.get("claim_version")
+                    or not claim.get("statement")
+                ):
+                    raise ValueError("Report 0.2 requires claim_id, claim_version and statement")
+                if (
+                    not set(
+                        claim.get("supporting_scene_ids", [])
+                        + claim.get("contradicting_scene_ids", [])
+                    )
+                    <= scene_ids
+                ):
+                    raise ValueError("Claim references an unknown scene")
+        return self
+
 
 def render_html_report(payload: ReportPayload, output: Path, status: str = "draft") -> Path:
+    from portrait_eval.html_reporting import render_evidence_html
+
     output.parent.mkdir(parents=True, exist_ok=True)
-    findings = "".join(
-        f"<article><p>{html.escape(str(item['statement']))}</p>"
-        f"<small>Evidence: {html.escape(', '.join(item.get('evidence', [])))}</small></article>"
-        for item in payload.findings
-    )
-    scenes = "".join(
-        f"<details><summary>{html.escape(str(scene.get('group_id', 'Scene')))}</summary>"
-        f"<pre>{html.escape(json.dumps(scene, ensure_ascii=False, indent=2))}</pre></details>"
-        for scene in payload.scene_results
-    )
-    external = "".join(
-        f"<li><a href='{html.escape(str(item.get('url', '#')))}'>{html.escape(str(item.get('title', 'Source')))}</a></li>"
-        for item in payload.external_validation
-    )
-    hardware = "".join(
-        f"<li><b>{html.escape(str(item.get('device_name', 'Device')))}</b>: "
-        f"<a href='{html.escape(str(item.get('url', '#')))}'>{html.escape(str(item.get('title', 'Source')))}</a> "
-        f"(Tier {html.escape(str(item.get('source_tier', '?')))})</li>"
-        for item in payload.hardware_context
-    )
-    attributions = "".join(
-        f"<details><summary>{html.escape(str(item.get('primary_layer', 'indeterminate')))}</summary>"
-        f"<pre>{html.escape(json.dumps(item, ensure_ascii=False, indent=2))}</pre></details>"
-        for item in payload.attributions
-    )
-    bias = "".join(
-        f"<details><summary>{html.escape(str(item.get('status', 'UNRESOLVED')))}</summary><pre>{html.escape(json.dumps(item, ensure_ascii=False, indent=2))}</pre></details>"
-        for item in payload.capture_bias
-    )
-    limitations = "".join(f"<li>{html.escape(item)}</li>" for item in payload.limitations)
-    banner = (
-        "FINAL REPORT — review gates resolved."
-        if status == "final"
-        else "DRAFT — verify review gates before external distribution."
-    )
-    banner_class = "final" if status == "final" else "draft"
-    document = f"""<!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width">
-<title>{html.escape(payload.project_name)}</title>
-<style>body{{font-family:"Noto Sans CJK SC",Arial,sans-serif;max-width:1200px;margin:40px auto;padding:0 24px;color:#202124}}header{{border-bottom:4px solid #f97316}}article,details{{border:1px solid #d6d6d6;padding:16px;margin:12px 0;border-radius:8px}}small{{color:#666}}pre{{white-space:pre-wrap}}.draft{{background:#fff3cd;padding:8px}}.final{{background:#dcfae6;padding:8px}}</style></head>
-<body><header><h1>{html.escape(payload.project_name)}</h1><p class="{banner_class}">{banner}</p>
-<p>Devices: {html.escape(", ".join(payload.devices))}</p></header>
-<section><h2>Evidence-backed findings</h2>{findings or "<p>No approved findings.</p>"}</section>
-<section><h2>Scene results</h2>{scenes}</section>
-<section><h2>Hardware context</h2><ul>{hardware or "<li>No hardware evidence retrieved.</li>"}</ul></section>
-<section><h2>External professional corroboration</h2><ul>{external or "<li>No relevant evidence retrieved.</li>"}</ul></section>
-<section><h2>Hardware–capture–reconstruction–rendering attribution</h2>{attributions or "<p>No attribution cases.</p>"}</section>
-<section><h2>Capture-bias assessment</h2>{bias or "<p>Not assessed.</p>"}</section>
-<section><h2>Limitations</h2><ul>{limitations}</ul></section></body></html>"""
-    output.write_text(document, encoding="utf-8")
+    output.write_text(render_evidence_html(payload, status), encoding="utf-8")
     return output
 
 
@@ -124,7 +103,30 @@ def _materialize_visual_assets(payload: ReportPayload, output_dir: Path) -> Repo
         asset["filename"] = source.name
         asset.pop("source_path", None)
         normalized.append(asset)
-    return payload.model_copy(update={"visual_assets": normalized})
+    extra_index = 0
+
+    def materialize(value: Any, key: str = "") -> Any:
+        nonlocal extra_index
+        if isinstance(value, dict):
+            return {k: materialize(v, k) for k, v in value.items()}
+        if isinstance(value, list):
+            return [materialize(item, key) for item in value]
+        if isinstance(value, str) and key.endswith("_path"):
+            source = Path(value)
+            if not source.is_absolute():
+                return value
+            if source.is_file():
+                extra_index += 1
+                destination = assets_dir / f"evidence-{extra_index:04d}{source.suffix.lower()}"
+                assets_dir.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(source, destination)
+                return destination.relative_to(output_dir).as_posix()
+            return ""
+        return value
+
+    return payload.model_copy(
+        update={"visual_assets": normalized, "scene_results": materialize(payload.scene_results)}
+    )
 
 
 def render_report_bundle(

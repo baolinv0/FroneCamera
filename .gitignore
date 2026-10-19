@@ -19,3 +19,5 @@ smoke.db
 
 *.tsbuildinfo
 web/package-lock.json
+
+.superpowers/

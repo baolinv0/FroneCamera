@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from fractions import Fraction
 from typing import Any
 
 from pydantic import BaseModel, Field
@@ -14,6 +15,8 @@ class AttributionCase(BaseModel):
     evidence_grade: str
     hardware_evidence_count: int = 0
     exif_evidence_keys: list[str] = Field(default_factory=list)
+    minimal_experiment: str = "Repeat matched captures with fixed lighting, pose and mode; vary one capture/rendering factor at a time and retain RAW when available."
+    mechanism_status: str = "competing_hypotheses_unverified"
 
 
 def attribute_output_claim(
@@ -74,12 +77,19 @@ def attribute_output_claim(
     exif_evidence_keys = sorted(
         key
         for key in ("ExposureTime", "ISO", "ISOSpeedRatings", "FNumber", "Flash")
-        if key in exif_context
+        if _known_exif(exif_context.get(key))
     )
-    if has_exif and any(key in exif_context for key in ("ExposureTime", "ISOSpeedRatings", "ISO")):
+    if has_exif and any(
+        key in exif_evidence_keys for key in ("ExposureTime", "ISOSpeedRatings", "ISO")
+    ):
         primary_layer = "capture_or_rendering"
         confidence = 0.62
-    if has_hardware and "front_focus" in hardware_context and ("focus" in text or "detail" in text):
+    if (
+        has_hardware
+        and hardware_context.get("front_focus")
+        and hardware_evidence_count
+        and ("focus" in text or "detail" in text)
+    ):
         primary_layer = "hardware_software_joint"
         confidence = 0.68
     evidence_grade = "B" if confidence >= 0.6 else "C"
@@ -93,3 +103,10 @@ def attribute_output_claim(
         hardware_evidence_count=hardware_evidence_count,
         exif_evidence_keys=exif_evidence_keys,
     )
+
+
+def _known_exif(value: Any) -> bool:
+    try:
+        return float(Fraction(str(value))) > 0
+    except (ValueError, TypeError, ZeroDivisionError, OverflowError):
+        return False
