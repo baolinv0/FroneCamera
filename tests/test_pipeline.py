@@ -151,6 +151,7 @@ def test_pipeline_runs_blind_visual_then_metric_validation_protocol(tmp_path: Pa
         )
     assert [context["pass"] for context in primary.contexts] == ["visual", "metric_validation"]
     assert "metrics" not in primary.contexts[0]
+    assert "observations" not in primary.contexts[0]["audit"]
     assert [context["pass"] for context in reviewer.contexts] == ["independent_visual", "challenge"]
     assert "primary" not in reviewer.contexts[0]
 

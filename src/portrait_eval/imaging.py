@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Any
 
 import cv2
 import numpy as np
-from PIL import Image, ImageOps
+
+from portrait_eval.color import load_analysis_rgb, save_analysis_image
 
 try:
     from pillow_heif import register_heif_opener
@@ -15,9 +17,13 @@ except ImportError:
 
 
 def load_rgb(path: Path) -> np.ndarray:
-    with Image.open(path) as image:
-        rgb = ImageOps.exif_transpose(image).convert("RGB")
-        return np.asarray(rgb)
+    return load_analysis_rgb(path)[0]
+
+
+def _linear_luminance(image: np.ndarray) -> np.ndarray:
+    rgb = image.astype(np.float32) / 255.0
+    linear = np.where(rgb <= 0.04045, rgb / 12.92, ((rgb + 0.055) / 1.055) ** 2.4)
+    return linear @ np.array([0.2126, 0.7152, 0.0722], dtype=np.float32)
 
 
 def _luminance(image: np.ndarray) -> np.ndarray:
@@ -25,14 +31,18 @@ def _luminance(image: np.ndarray) -> np.ndarray:
     return 0.2126 * rgb[..., 0] + 0.7152 * rgb[..., 1] + 0.0722 * rgb[..., 2]
 
 
-def detect_primary_face(image: np.ndarray) -> list[int] | None:
+def detect_faces(image: np.ndarray) -> list[list[int]]:
     gray = cv2.cvtColor(image, cv2.COLOR_RGB2GRAY)
     cascade = cv2.CascadeClassifier(cv2.data.haarcascades + "haarcascade_frontalface_default.xml")
     faces = cascade.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=5, minSize=(32, 32))
-    if len(faces) == 0:
-        return None
-    x, y, w, h = max(faces, key=lambda value: value[2] * value[3])
-    return [int(x), int(y), int(w), int(h)]
+    return sorted(
+        ([int(v) for v in box] for box in faces), key=lambda box: (-box[2] * box[3], box[0], box[1])
+    )
+
+
+def detect_primary_face(image: np.ndarray) -> list[int] | None:
+    faces = detect_faces(image)
+    return faces[0] if faces else None
 
 
 def compute_image_metrics(image: np.ndarray) -> dict[str, float]:
@@ -43,10 +53,14 @@ def compute_image_metrics(image: np.ndarray) -> dict[str, float]:
     residual = gray.astype(np.float32) - cv2.GaussianBlur(gray, (5, 5), 0).astype(np.float32)
     return {
         "luma_mean": round(float(luma.mean()), 6),
+        "encoded_luma_mean": round(float(luma.mean()), 6),
+        "linear_luminance_mean": round(float(_linear_luminance(image).mean()), 6),
         "luma_p10": round(float(np.quantile(luma, 0.10)), 6),
         "luma_p50": round(float(np.quantile(luma, 0.50)), 6),
         "luma_p90": round(float(np.quantile(luma, 0.90)), 6),
         "highlight_clip_ratio": round(float((luma >= 0.98).mean()), 6),
+        "encoded_near_white_ratio": round(float((luma >= 0.98).mean()), 6),
+        "channel_endpoint_ratio": round(float((image >= 250).any(axis=2).mean()), 6),
         "deep_shadow_ratio": round(float((luma <= 0.02).mean()), 6),
         "saturation_mean": round(float((hsv[..., 1] / 255.0).mean()), 6),
         "apparent_detail": round(float(laplacian.var()), 6),
@@ -134,11 +148,50 @@ def _write_diagnostic(
     return output_path
 
 
-def analyze_image(path: Path, artifact_dir: Path | None = None) -> dict[str, object]:
-    image = load_rgb(path)
+def analyze_image(
+    path: Path,
+    artifact_dir: Path | None = None,
+    face_annotations: list[dict] | None = None,
+) -> dict:
+    image, rendering = load_analysis_rgb(path)
     luma = _luminance(image)
-    face = detect_primary_face(image)
+    boxes = (
+        detect_faces(image)
+        if face_annotations is None
+        else [item["bbox_xywh"] for item in face_annotations]
+    )
+    faces: list[dict[str, Any]] = []
+    for index, box in enumerate(boxes):
+        x, y, w, h = box
+        if x < 0 or y < 0 or w <= 0 or h <= 0 or x + w > image.shape[1] or y + h > image.shape[0]:
+            raise ValueError("Face box lies outside the oriented analysis image")
+        item = {
+            "face_id": f"F{index + 1:03d}",
+            "bbox_xywh": list(box),
+            "role": face_annotations[index].get("role", "UNASSIGNED")
+            if face_annotations is not None
+            else "UNASSIGNED",
+            "provenance": "manual" if face_annotations is not None else "haar_detection",
+            "position": face_annotations[index].get("position", "unknown")
+            if face_annotations is not None
+            else "unknown",
+            "metrics": compute_image_metrics(image[y : y + h, x : x + w]),
+        }
+        if artifact_dir is not None:
+            crop = save_analysis_image(
+                image[y : y + h, x : x + w],
+                artifact_dir / f"{path.stem}-{item['face_id']}-native.png",
+            )
+            item["native_crop_path"] = str(crop)
+        faces.append(item)
+    face = max(boxes, key=lambda box: box[2] * box[3]) if boxes else None
     masks = _region_masks(image.shape[:2], face, luma)
+    for item in faces:
+        x, y, w, h = item["bbox_xywh"]
+        masks["background"][
+            max(0, y - int(0.35 * h)) : min(image.shape[0], y + h + int(0.35 * h)),
+            max(0, x - int(0.35 * w)) : min(image.shape[1], x + w + int(0.35 * w)),
+        ] = False
     regions: dict[str, dict[str, float]] = {}
     for name, mask in masks.items():
         value = _masked_metrics(image, mask)
@@ -149,23 +202,33 @@ def analyze_image(path: Path, artifact_dir: Path | None = None) -> dict[str, obj
         "whole": compute_image_metrics(image),
         "image_size": [int(image.shape[1]), int(image.shape[0])],
         "face_bbox": face,
+        "faces": faces,
+        "rendering": rendering,
+        "metric_definitions": {
+            "luma_mean": "legacy alias of encoded_luma_mean: Y prime = .2126 R prime + .7152 G prime + .0722 B prime",
+            "linear_luminance_mean": "Y = weighted inverse-sRGB RGB; display referred, not scene illuminance",
+            "highlight_clip_ratio": "legacy alias of encoded_near_white_ratio, Y prime >= .98; does not prove sensor clipping",
+        },
         "regions": regions,
         "warnings": [],
     }
     if face is None:
-        payload["warnings"] = ["face_not_detected"]
+        payload["warnings"] = ["face_not_detected_not_proof_of_no_people"]
     else:
         face_metrics = regions.get("face")
         if face_metrics:
             payload["face"] = face_metrics
 
     if artifact_dir is not None:
+        payload["analysis_path"] = str(
+            save_analysis_image(image, artifact_dir / f"{path.stem}-srgb.png")
+        )
         diagnostic_path = artifact_dir / f"{path.stem}-diagnostic.jpg"
         payload["diagnostic_path"] = str(_write_diagnostic(image, face, masks, diagnostic_path))
     return payload
 
 
-def audit_scene(metrics_by_device: dict[str, dict[str, object]]) -> dict[str, object]:
+def audit_scene(metrics_by_device: dict[str, dict[str, Any]]) -> dict[str, Any]:
     valid = [payload for payload in metrics_by_device.values() if payload]
     warnings: list[str] = []
     observations: list[str] = []
@@ -176,16 +239,18 @@ def audit_scene(metrics_by_device: dict[str, dict[str, object]]) -> dict[str, ob
             "warnings": ["fewer_than_two_valid_images"],
             "observations": observations,
             "suggested_tags": tags,
+            "challenge": {"primary": "unknown", "basis": "no_capture_annotation"},
+            "attribute_comparability": {},
         }
 
     lumas = [float(payload["whole"]["luma_mean"]) for payload in valid]  # type: ignore[index]
-    p90s = [float(payload["whole"]["luma_p90"]) for payload in valid]  # type: ignore[index]
-    p10s = [float(payload["whole"]["luma_p10"]) for payload in valid]  # type: ignore[index]
     if max(lumas) - min(lumas) > 0.35:
         observations.append("large_rendered_brightness_difference")
 
     face_count = sum(payload.get("face_bbox") is not None for payload in valid)
-    if face_count != len(valid):
+    if face_count == 0:
+        observations.append("face_detection_unverified")
+    elif face_count != len(valid):
         warnings.append("inconsistent_face_detection")
     else:
         face_areas: list[float] = []
@@ -218,14 +283,20 @@ def audit_scene(metrics_by_device: dict[str, dict[str, object]]) -> dict[str, ob
                 warnings.append("face_position_difference")
 
     if sum(lumas) / len(lumas) < 0.22:
-        tags.append("low_light")
-    if sum((p90 - p10) for p90, p10 in zip(p90s, p10s, strict=True)) / len(valid) > 0.65:
-        tags.append("high_dynamic_range")
-    if any(float(payload["whole"]["highlight_clip_ratio"]) > 0.02 for payload in valid):  # type: ignore[index]
-        tags.append("strong_highlight")
+        observations.append("dark_rendered_output")
+    attribute_comparability = {
+        "global_exposure": "COMPARABLE_WITH_CONFOUNDERS" if warnings else "FULLY_COMPARABLE",
+        "highlight_retention": "COMPARABLE_WITH_CONFOUNDERS" if warnings else "FULLY_COMPARABLE",
+        "skin_awb": "FULLY_COMPARABLE"
+        if all(payload.get("rendering", {}).get("color_claims_allowed") for payload in valid)
+        else "INSUFFICIENT_EVIDENCE",
+        "native_detail": "INSUFFICIENT_EVIDENCE",
+    }
     return {
         "status": "FULLY_COMPARABLE" if not warnings else "COMPARABLE_WITH_CONFOUNDERS",
         "warnings": warnings,
         "observations": observations,
         "suggested_tags": tags,
+        "challenge": {"primary": "unknown", "basis": "no_capture_annotation"},
+        "attribute_comparability": attribute_comparability,
     }

@@ -260,6 +260,7 @@ def _add_spacer(document: DocxDocument, points: float = 5) -> None:
     paragraph = document.add_paragraph()
     paragraph.paragraph_format.space_after = Pt(0)
     paragraph.paragraph_format.line_spacing = Pt(points)
+    paragraph.paragraph_format.keep_with_next = True
 
 
 def _set_picture_alt(picture: Any, title: str, description: str) -> None:
@@ -302,9 +303,9 @@ def _add_cover(document: DocxDocument, payload: ReportPayload, status: str) -> N
         _set_run_font(run, size=7, color=MUTED)
     _add_spacer(document, 6)
     banner = (
-        "FINAL REPORT — review gates resolved."
+        "FINAL REPORT — 模型辅助观察报告；人工验证 pending。"
         if status == "final"
-        else "DRAFT — verify review gates before external distribution."
+        else "DRAFT — 模型辅助观察报告；人工验证 pending。"
     )
     _add_callout(
         document,
@@ -344,6 +345,11 @@ def _add_section_band(document: DocxDocument, number: str, title: str, strapline
     strap.paragraph_format.space_after = Pt(0)
     run = strap.add_run(strapline)
     _set_run_font(run, size=8, color="D6D6D6")
+    for row in table.rows:
+        row._tr.get_or_add_trPr().append(OxmlElement("w:cantSplit"))
+        for cell in row.cells:
+            for paragraph in cell.paragraphs:
+                paragraph.paragraph_format.keep_with_next = True
     _add_spacer(document, 4)
 
 
@@ -473,8 +479,15 @@ def _score_rows(payload: ReportPayload) -> tuple[list[dict[str, Any]], bool]:
 
 def _font(size: int, *, bold: bool = False) -> ImageFont.FreeTypeFont | ImageFont.ImageFont:
     candidates = (
+        Path("/usr/local/share/fonts/NotoSansCJKsc-Regular.otf"),
+        Path("/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc"),
         Path("C:/Windows/Fonts/msyhbd.ttc" if bold else "C:/Windows/Fonts/msyh.ttc"),
         Path("C:/Windows/Fonts/arialbd.ttf" if bold else "C:/Windows/Fonts/arial.ttf"),
+        Path(
+            "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
+            if bold
+            else "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"
+        ),
     )
     for candidate in candidates:
         if candidate.exists():
@@ -621,7 +634,7 @@ def _create_montage(
     output: Path,
 ) -> tuple[Path | None, int]:
     valid: list[tuple[dict[str, Any], Image.Image]] = []
-    for asset in assets[:6]:
+    for asset in assets:
         path = _resolve_asset(asset, base_dir)
         if path is None:
             continue
@@ -642,10 +655,12 @@ def _create_montage(
     for index, (asset, panel_image) in enumerate(valid):
         x = (index % columns) * (panel_width + gutter)
         y = (index // columns) * (image_height + label_height + gutter)
-        fitted = ImageOps.fit(
+        fitted = ImageOps.contain(
             panel_image, (panel_width, image_height), method=Image.Resampling.LANCZOS
         )
-        canvas.paste(fitted, (x, y))
+        canvas.paste(
+            fitted, (x + (panel_width - fitted.width) // 2, y + (image_height - fitted.height) // 2)
+        )
         draw.rectangle(
             (x, y + image_height, x + panel_width, y + image_height + label_height), fill=f"#{INK}"
         )
@@ -707,33 +722,54 @@ def _add_scene_sections(
             _scene_title(scene, index),
             "横向样张证据、设备观察、场景审计与效果机制解释。",
         )
-        conclusion = "；".join(_safe_text(item.get("statement")) for item in findings[:4])
+        conclusion = "；".join(
+            _safe_text(item.get("statement"))
+            for item in findings[:4]
+            if item.get("status") in {"SUPPORTED", "SUPPORTED_SCOPED", "CONFIRMED"}
+        )
         audit = scene.get("audit", {}) if isinstance(scene.get("audit"), dict) else {}
         if not conclusion:
             warnings = audit.get("warnings", []) if isinstance(audit, dict) else []
             conclusion = "；".join(map(str, warnings)) or "本场景尚无通过发布门槛的结论。"
         _add_callout(document, "场景结论", conclusion, accent=True)
 
-        montage, count = _create_montage(
-            assets_by_scene.get(scene_id, []),
-            base_dir,
-            temp_dir / f"scene-{index:02d}.jpg",
-        )
-        if montage:
-            paragraph = document.add_paragraph()
-            paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER
-            picture = paragraph.add_run().add_picture(str(montage), width=Inches(7.08))
-            _set_picture_alt(
-                picture,
-                f"{scene_id} sample montage",
-                f"Representative front-camera samples for {scene_id}; {count} labeled device panels.",
+        assets = assets_by_scene.get(scene_id, [])
+        for batch in range(0, len(assets), 6):
+            montage, count = _create_montage(
+                assets[batch : batch + 6], base_dir, temp_dir / f"scene-{index:02d}-{batch}.jpg"
             )
-            caption = document.add_paragraph(style="Report Caption")
-            caption.add_run(
-                f"图 {index + 1}  {scene_id} 代表样张，共 {count} 张；裁切仅用于统一版面展示。"
-            )
-        else:
-            _add_callout(document, "样张状态", "该场景未提供可嵌入的代表样张，保留结构化观察。")
+            if montage:
+                paragraph = document.add_paragraph()
+                paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER
+                picture = paragraph.add_run().add_picture(str(montage), width=Inches(7.08))
+                _set_picture_alt(
+                    picture,
+                    f"{scene_id} sample montage",
+                    f"{scene_id}; {count} full-frame device panels",
+                )
+                caption = document.add_paragraph(style="Report Caption")
+                caption.add_run(
+                    f"图 {index + 1} {scene_id} 样张 {batch + 1}-{batch + count}；完整画面缩放，保留边界。"
+                )
+        if not assets:
+            _add_callout(document, "样张状态", "该场景未提供可嵌入样张，保留结构化观察。")
+        for device, metrics in scene.get("metrics", {}).items():
+            for face in metrics.get("faces", []):
+                native = _resolve_asset({"path": face.get("native_crop_path")}, base_dir)
+                if native:
+                    paragraph = document.add_paragraph()
+                    paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER
+                    with Image.open(native) as opened:
+                        width = min(3.2, 2.8 * opened.width / opened.height)
+                    picture = paragraph.add_run().add_picture(str(native), width=Inches(width))
+                    identity = f"crop:{scene_id}:{device}:{face['face_id']}"
+                    _set_picture_alt(
+                        picture, identity, f"Native face pixels, {face.get('role', 'UNASSIGNED')}"
+                    )
+                    caption = document.add_paragraph(style="Report Caption")
+                    caption.add_run(
+                        f"{identity} · {face.get('role', 'UNASSIGNED')} · 原生像素裁剪，页面缩放显示；坐标 {face.get('bbox_xywh', 'unknown')}"
+                    )
 
         if observations:
             table = document.add_table(rows=1, cols=3)
@@ -825,9 +861,16 @@ def _add_attribution_and_context(
             alternatives = item.get("alternative_explanations", [])
             values = (
                 _device_name(_safe_text(item.get("device_id"), "—"), payload),
-                _safe_text(item.get("observable_effect") or item.get("rationale"), "—"),
+                _safe_text(
+                    item.get("statement") or item.get("observable_effect") or item.get("rationale"),
+                    "unknown",
+                )
+                + "；竞争假设："
+                + "；".join(map(str, item.get("candidate_causes", []))),
                 _safe_text(item.get("attribution") or item.get("primary_layer"), "indeterminate"),
-                "；".join(map(str, alternatives)) or "—",
+                ("；".join(map(str, alternatives)) or "unknown")
+                + "；最小实验："
+                + _safe_text(item.get("minimal_experiment"), "unknown"),
             )
             for cell, value in zip(cells, values, strict=True):
                 _shade_cell(cell, WHITE)
@@ -877,11 +920,17 @@ def _add_failure_modes(document: DocxDocument, payload: ReportPayload, number: i
             values = (
                 _safe_text(item.get("status"), "UNRESOLVED"),
                 _safe_text(
-                    item.get("assessment") or item.get("reason") or item.get("summary"),
-                    "需要人工复核",
+                    "；".join(map(str, item.get("reasons", [])))
+                    or item.get("assessment")
+                    or item.get("reason")
+                    or item.get("summary"),
+                    "unknown",
                 ),
                 _safe_text(
-                    item.get("recommendation") or item.get("controlled_reshoot"), "增加受控重拍"
+                    "；".join(map(str, item.get("recommended_actions", [])))
+                    or item.get("recommendation")
+                    or item.get("controlled_reshoot"),
+                    "unknown",
                 ),
             )
             for cell, value in zip(cells, values, strict=True):
@@ -968,6 +1017,33 @@ def _add_appendix(document: DocxDocument, payload: ReportPayload, number: int) -
                 _shade_cell(cell, WHITE)
                 _set_cell_border(cell)
                 _cell_text(cell, value, size=7.5)
+    if payload.challenge_matrix:
+        _add_callout(
+            document,
+            "输入挑战矩阵",
+            "；".join(
+                f"{row['label']}: {', '.join(row['scene_ids']) or '未覆盖'}"
+                for row in payload.challenge_matrix
+            ),
+        )
+    for claim in payload.all_claims:
+        _add_callout(
+            document,
+            _safe_text(claim.get("claim_id"), "legacy claim"),
+            _safe_text(claim.get("statement"))
+            + "\n支持："
+            + ", ".join(claim.get("supporting_scene_ids", []))
+            + "；反例："
+            + ", ".join(claim.get("contradicting_scene_ids", []))
+            + "；未知："
+            + ", ".join(claim.get("unknown_scene_ids", []))
+            + "；不可比："
+            + ", ".join(claim.get("incomparable_scene_ids", []))
+            + "；家族分母："
+            + str(claim.get("evidence_counts", {}))
+            + "；状态："
+            + _safe_text(claim.get("status")),
+        )
     limitations = "；".join(payload.limitations) or "没有额外限制记录。"
     _add_callout(document, "严格限制", limitations)
     _add_callout(
@@ -997,6 +1073,9 @@ def render_docx_report(
     section.bottom_margin = Inches(0.4528)
     section.header_distance = Inches(0.1771)
     section.footer_distance = Inches(0.1771)
+    for node in section.footer._element.xpath(".//w:t"):
+        if node.text and "六款旗舰手机" in node.text:
+            node.text = node.text.replace("六款旗舰手机前摄影调风格评测", "前摄样张证据评测")
     for footer_table in section.footer.tables:
         _set_table_geometry(footer_table, [3.6, 3.6])
 

@@ -1,45 +1,19 @@
-# Implementation Status
+# Implementation status
 
-## v0.1 completed
+Updated 2026-10-19. See [implementation results](evaluation_upgrade/2026-10-19/IMPLEMENTATION_RESULTS.md) for tests, usage and limits.
 
-The repository contains a runnable end-to-end MVP covering:
+| Capability | Design defined | Code implemented | Runtime connected | Tests | Real samples verified |
+|---|---|---|---|---|---|
+| Frozen pairing and input hashes | Yes | Yes | API/workflow/worker | Regression | Pending this change |
+| ICC/EXIF/SDR rendering | Yes | Core paths | Pipeline/VLM/reports | P3/EXIF/precision fixtures | Pending |
+| All-face/native ROI | Yes | Haar/manual correction | Pipeline and reports | Pixel/annotation/HTTP tests | Diverse faces pending |
+| Structured proposition review | Yes | Yes | Adjudication | Direction/region/reference | Human calibration pending |
+| Family counterexamples | Yes | Two narrow output tendencies | Strategy | Full denominator/counterexamples | Family annotation pending |
+| External binding | Yes | Yes | Post-freeze retrieval | Device/version/source isolation | Excerpts remain background |
+| Professional report | Yes | Core HTML/DOCX | ReportPayload 0.2 | Export tests and 4-page render | Camera0717 pending |
+| Strict core v2 inference | Yes | Models/storage exist | Not fully migrated | Existing storage tests retained | No |
+| Skin/lighting/group strategies | Yes | Partial | Collection only | No validity claim | No |
+| Perception calibration | Yes | Protocol only | No | Not run | No |
+| Editing feedback loop | Yes | Not implemented this change | No | Not run | No |
 
-- project/device creation;
-- image scan and editable generic pairing;
-- immutable, versioned pairing snapshots;
-- SQLite persistence and migrations;
-- objective image metrics and diagnostic regions;
-- two-stage primary visual/metric protocol and independent/challenge reviewer protocol;
-- deterministic fallback analysis;
-- evidence adjudication and cross-scene claims;
-- internal-result freeze;
-- external hardware/professional-review retrieval and text-evidence corroboration classification;
-- capture-bias and attribution cases;
-- atomic persistent worker tasks with bounded retry;
-- browser review interfaces;
-- review-aware immutable final report bundle with reference-derived DOCX, optional PDF, and project export;
-- Docker and CI definitions;
-- backend unit/integration tests.
-
-## Deployment dependencies not stored in Git
-
-- proprietary or open model weights;
-- the actual vLLM/SGLang services;
-- a SearxNG deployment;
-- user image datasets;
-- fonts or system packages needed by the optional PDF renderer.
-
-## Expected next calibration work
-
-The software workflow is complete, but formal use still requires empirical calibration on the target server and image set:
-
-1. validate the selected face/ROI backend on diverse faces and lighting;
-2. calibrate metric thresholds against manually reviewed samples;
-3. validate prompt JSON compliance and position invariance for both VLM families;
-4. test BF16/quantized deployment on the 98 GB GPU;
-5. define the approved professional-source domain list for the organization;
-6. conduct a controlled three-repeat pilot to quantify capture variance.
-
-## Verification evidence
-
-The current branch is verified with backend unit/integration tests, MyPy, Ruff, frontend Vitest, TypeScript/Vite production build, npm audit, and an end-to-end smoke run covering asynchronous worker execution, human review resolution, final report generation, and project export.
+The system produces an auditable model-assisted report. Rule grades and document finalization are not human validation. Model services, optional search, fonts and datasets remain deployment inputs. Current-run verification is distinct from historical capability claims.

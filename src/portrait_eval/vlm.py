@@ -9,22 +9,73 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 import httpx
-from PIL import Image, ImageOps
+from PIL import Image
 
+from portrait_eval.color import SRGB_PROFILE, load_analysis_rgb
 from portrait_eval.models import ModelEvaluationResult, ModelObservation
 
 if TYPE_CHECKING:
     from portrait_eval.config import Settings
 
 
-def encode_image_data_url(path: Path, max_edge: int = 1536) -> str:
-    with Image.open(path) as source:
-        image = ImageOps.exif_transpose(source).convert("RGB")
-        image.thumbnail((max_edge, max_edge), Image.Resampling.LANCZOS)
-        buffer = BytesIO()
-        image.save(buffer, format="JPEG", quality=92, optimize=True)
+def encode_image_data_url(path: Path, max_edge: int = 1536, *, lossless: bool = False) -> str:
+    pixels, _ = load_analysis_rgb(path)
+    image = Image.fromarray(pixels)
+    image.thumbnail((max_edge, max_edge), Image.Resampling.LANCZOS)
+    buffer = BytesIO()
+    if lossless:
+        image.save(buffer, format="PNG", icc_profile=SRGB_PROFILE)
+    else:
+        image.save(buffer, format="JPEG", quality=92, optimize=True, icc_profile=SRGB_PROFILE)
     encoded = base64.b64encode(buffer.getvalue()).decode("ascii")
-    return f"data:image/jpeg;base64,{encoded}"
+    mime = "png" if lossless else "jpeg"
+    return f"data:image/{mime};base64,{encoded}"
+
+
+def _visible_context(context: dict[str, Any]) -> dict[str, Any]:
+    clean = {key: value for key, value in context.items() if key != "evidence_inputs"}
+    clean["available_evidence"] = [
+        {key: value for key, value in item.items() if key != "path"}
+        for items in context.get("evidence_inputs", {}).values()
+        for item in items
+    ]
+    return clean
+
+
+def _image_inputs(
+    image_paths: dict[str, Path], context: dict[str, Any], max_edge: int
+) -> list[dict[str, Any]]:
+    inputs = []
+    for code, path in image_paths.items():
+        entries = context.get("evidence_inputs", {}).get(code) or [
+            {"evidence_id": f"asset:unknown:{code}", "kind": "whole", "path": str(path)}
+        ]
+        for item in entries:
+            pixels, _ = load_analysis_rgb(Path(item["path"]))
+            height, width = pixels.shape[:2]
+            inputs.append(
+                {
+                    **item,
+                    "anonymous_device": code,
+                    "source_size": [width, height],
+                    "sent_max_edge": max_edge,
+                    "native_resolution_preserved": max(width, height) <= max_edge,
+                    "encoding": "PNG" if item["kind"] == "native_face" else "JPEG q92",
+                    "native_pixels_preserved": item["kind"] == "native_face"
+                    and max(width, height) <= max_edge,
+                }
+            )
+    return inputs
+
+
+def _record_result_inputs(
+    parsed: dict[str, Any], inputs: list[dict[str, Any]], model: str, endpoint: str
+) -> None:
+    parsed["model_id"] = f"{endpoint}:{model}"
+    parsed["model_family"] = "unknown"
+    parsed["viewed_evidence"] = [
+        {key: value for key, value in item.items() if key != "path"} for item in inputs
+    ]
 
 
 def parse_json_object(content: str) -> dict[str, Any]:
@@ -109,13 +160,23 @@ class OpenAICompatibleVisionAdapter(VisionModelAdapter):
         self, scene_id: str, image_paths: dict[str, Path], context: dict[str, Any]
     ) -> ModelEvaluationResult:
         content: list[dict[str, Any]] = [{"type": "text", "text": self._prompt(scene_id, context)}]
-        for code, path in image_paths.items():
+        inputs = _image_inputs(image_paths, context, self.max_image_edge)
+        for item in inputs:
             content.extend(
                 [
-                    {"type": "text", "text": f"Anonymous device {code}"},
+                    {
+                        "type": "text",
+                        "text": f"Anonymous device {item['anonymous_device']}; evidence={item['evidence_id']}; type={item['kind']}; native pixels preserved={item['native_pixels_preserved']}",
+                    },
                     {
                         "type": "image_url",
-                        "image_url": {"url": encode_image_data_url(path, self.max_image_edge)},
+                        "image_url": {
+                            "url": encode_image_data_url(
+                                Path(item["path"]),
+                                self.max_image_edge,
+                                lossless=item["kind"] == "native_face",
+                            )
+                        },
                     },
                 ]
             )
@@ -132,13 +193,15 @@ class OpenAICompatibleVisionAdapter(VisionModelAdapter):
         raw = response.json()
         parsed = parse_json_object(raw["choices"][0]["message"]["content"])
         parsed.update({"scene_id": scene_id, "role": self.role, "raw": raw})
+        _record_result_inputs(parsed, inputs, self.model, self.base_url)
         return ModelEvaluationResult.model_validate(parsed)
 
     def _prompt(self, scene_id: str, context: dict[str, Any]) -> str:
         return (
             "Evaluate anonymous front-camera portraits. Separate visible observations, subjective preferences, "
             "and mechanism hypotheses. Do not identify brands. Return JSON with observations, scores, hypotheses, "
-            f"confidence. Scene={scene_id}. Objective context={json.dumps(context, ensure_ascii=False)}"
+            "Every observation must include region, attribute, direction (higher/lower/equal/unknown), comparison, strength, conditions and evidence_refs. Unknown evidence stays unknown. "
+            f"confidence. Scene={scene_id}. Objective context={json.dumps(_visible_context(context), ensure_ascii=False)}"
         )
 
 
@@ -171,13 +234,21 @@ class OpenAIResponsesVisionAdapter(VisionModelAdapter):
         content: list[dict[str, Any]] = [
             {"type": "input_text", "text": self._prompt(scene_id, context)}
         ]
-        for code, path in image_paths.items():
+        inputs = _image_inputs(image_paths, context, self.max_image_edge)
+        for item in inputs:
             content.extend(
                 [
-                    {"type": "input_text", "text": f"Anonymous device {code}"},
+                    {
+                        "type": "input_text",
+                        "text": f"Anonymous device {item['anonymous_device']}; evidence={item['evidence_id']}; type={item['kind']}; native pixels preserved={item['native_pixels_preserved']}",
+                    },
                     {
                         "type": "input_image",
-                        "image_url": encode_image_data_url(path, self.max_image_edge),
+                        "image_url": encode_image_data_url(
+                            Path(item["path"]),
+                            self.max_image_edge,
+                            lossless=item["kind"] == "native_face",
+                        ),
                     },
                 ]
             )
@@ -215,6 +286,7 @@ class OpenAIResponsesVisionAdapter(VisionModelAdapter):
         raw = response.json()
         parsed = parse_json_object(extract_responses_output_text(raw))
         parsed.update({"scene_id": scene_id, "role": self.role, "raw": raw})
+        _record_result_inputs(parsed, inputs, self.model, self.base_url)
         return ModelEvaluationResult.model_validate(parsed)
 
     def _prompt(self, scene_id: str, context: dict[str, Any]) -> str:
@@ -223,6 +295,12 @@ class OpenAIResponsesVisionAdapter(VisionModelAdapter):
                 {
                     "device_id": "anonymous device code such as A",
                     "dimension": "stable snake_case rendering dimension",
+                    "region": "whole or face:F001 or a locatable region; unknown if not observed",
+                    "attribute": "encoded_luma_mean, encoded_near_white_ratio, or specific visual attribute",
+                    "direction": "higher|lower|equal|unknown",
+                    "comparison": "peer_median or anonymous peer code or unknown",
+                    "strength": "visible magnitude or unknown",
+                    "conditions": ["applicable capture/rendering conditions"],
                     "statement": "visible, evidence-based comparison",
                     "evidence_refs": ["asset or metric reference"],
                     "certainty": "number from 0 to 1",
@@ -249,7 +327,7 @@ class OpenAIResponsesVisionAdapter(VisionModelAdapter):
             "sensitive personal traits. Do not claim that final images prove a proprietary ISP mechanism. "
             "Return one JSON object only and include every top-level field in this contract: "
             f"{json.dumps(contract, ensure_ascii=False)}. Scene={scene_id}. "
-            f"Evaluation context={json.dumps(context, ensure_ascii=False)}"
+            f"Evaluation context={json.dumps(_visible_context(context), ensure_ascii=False)}"
         )
 
 
@@ -327,10 +405,11 @@ class HeuristicVisionAdapter(VisionModelAdapter):
                 ModelObservation(
                     device_id=brightest,
                     dimension="global_exposure",
-                    statement=(
-                        "This output has the highest display-referred mean luminance in the "
-                        "matched group."
-                    ),
+                    statement="This output has higher encoded global luma than the group median; this is a rendered-output measurement, not a quality preference.",
+                    region="whole",
+                    attribute="encoded_luma_mean",
+                    direction="higher",
+                    comparison="peer_median",
                     evidence_refs=[f"metric:{scene_id}:{brightest}:luma_mean"],
                     certainty=0.95,
                 )
@@ -343,4 +422,6 @@ class HeuristicVisionAdapter(VisionModelAdapter):
             hypotheses=[],
             confidence=0.65,
             raw={"adapter": "heuristic"},
+            model_id="heuristic_metrics_0.2",
+            model_family="deterministic_metrics",
         )

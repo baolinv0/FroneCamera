@@ -1,97 +1,120 @@
 from __future__ import annotations
 
-from statistics import median
-from typing import Any
+from typing import Any, Literal
 
 from portrait_eval.adjudication import adjudicate_claim
-from portrait_eval.models import AdjudicatedClaim, ClaimCandidate
+from portrait_eval.evidence import claim_identity, measure_observation
+from portrait_eval.models import AdjudicatedClaim, ClaimCandidate, ModelObservation
 
 
-def infer_cross_scene_claims(scene_results: list[dict[str, Any]]) -> list[AdjudicatedClaim]:
-    """Infer conservative cross-scene output tendencies from matched-group metrics.
-
-    The function only describes rendered-output tendencies. It does not infer a proprietary ISP
-    mechanism. Claims need at least two supporting groups to escape the insufficient-coverage gate,
-    and three groups for the strongest evidence grade.
-    """
-
-    device_ids: set[str] = set()
-    for scene in scene_results:
-        device_ids.update(scene.get("metrics", {}).keys())
-
-    claims: list[AdjudicatedClaim] = []
-    for device_id in sorted(device_ids):
-        brighter_support: list[str] = []
-        brighter_counter: list[str] = []
-        lower_clip_support: list[str] = []
-        lower_clip_counter: list[str] = []
-
-        for scene in scene_results:
-            metrics_by_device = scene.get("metrics", {})
-            if device_id not in metrics_by_device or len(metrics_by_device) < 2:
+def infer_cross_scene_claims(
+    scene_results: list[dict[str, Any]], version: str = "0.2"
+) -> list[AdjudicatedClaim]:
+    """Summarize only measured output tendencies, retaining family conflicts and all outcomes."""
+    devices = sorted({device for scene in scene_results for device in scene.get("metrics", {})})
+    claims = []
+    for device in devices:
+        for attribute, direction, statement in (
+            (
+                "encoded_luma_mean",
+                "higher",
+                "In the listed comparable scene families, this output has higher encoded global luma than the group median.",
+            ),
+            (
+                "encoded_near_white_ratio",
+                "lower",
+                "In the listed comparable scene families, this output has a lower near-white pixel ratio than the group median; this does not establish retained highlight detail.",
+            ),
+        ):
+            buckets: dict[str, list[str]] = {
+                key: [] for key in ("support", "counterexample", "unknown", "incomparable")
+            }
+            families = {}
+            evidence: list[dict[str, Any]] = []
+            typed_direction: Literal["higher", "lower", "equal", "unknown"] = (
+                "higher" if direction == "higher" else "lower"
+            )
+            for scene in scene_results:
+                group = str(scene["group_id"])
+                family = scene.get("scene_family")
+                if family:
+                    families[group] = str(family)
+                audit = scene.get("audit", {})
+                if audit.get("status") not in {None, "FULLY_COMPARABLE"}:
+                    buckets["incomparable"].append(group)
+                    continue
+                observation = ModelObservation(
+                    device_id=device,
+                    dimension=attribute,
+                    statement=statement,
+                    certainty=0,
+                    region="whole",
+                    attribute=attribute,
+                    direction=typed_direction,
+                    comparison="peer_median",
+                )
+                support, records = measure_observation(
+                    observation,
+                    scene.get("metrics", {}),
+                    {**audit, "status": audit.get("status", "FULLY_COMPARABLE")},
+                )
+                evidence.extend(dict(record, scene_id=group) for record in records)
+                if support is None or not records:
+                    key = "unknown"
+                elif support == 1:
+                    key = "support"
+                elif records[0]["direction"] == "equal":
+                    key = "unknown"
+                else:
+                    key = "counterexample"
+                buckets[key].append(group)
+            if not buckets["support"]:
                 continue
-            group_id = str(scene.get("group_id"))
-            lumas = {
-                current: float(payload.get("whole", {}).get("luma_mean", 0.0))
-                for current, payload in metrics_by_device.items()
-            }
-            clips = {
-                current: float(payload.get("whole", {}).get("highlight_clip_ratio", 0.0))
-                for current, payload in metrics_by_device.items()
-            }
-            luma_mid = median(lumas.values())
-            clip_mid = median(clips.values())
-            if lumas[device_id] > luma_mid + 0.03:
-                brighter_support.append(group_id)
-            elif lumas[device_id] < luma_mid - 0.03:
-                brighter_counter.append(group_id)
-            if clips[device_id] < clip_mid - 0.002:
-                lower_clip_support.append(group_id)
-            elif clips[device_id] > clip_mid + 0.002:
-                lower_clip_counter.append(group_id)
-
-        if brighter_support:
+            # Same-family mixed outcomes are explicit counterexamples; never majority-vote them away.
             claims.append(
                 adjudicate_claim(
                     ClaimCandidate(
-                        device_id=device_id,
-                        statement=(
-                            "Across the matched groups listed as evidence, this device tends to render "
-                            "a higher display-referred global luminance than the group median."
-                        ),
+                        device_id=device,
+                        statement=statement,
                         claim_type="strategy",
-                        supporting_scene_ids=brighter_support,
-                        contradicting_scene_ids=brighter_counter,
-                        model_agreement=0.75,
-                        objective_support=1.0,
-                        scene_validity=0.85,
+                        claim_id=claim_identity(
+                            device,
+                            "cross_scene",
+                            statement,
+                            "whole",
+                            attribute,
+                            direction,
+                            version,
+                            comparison="peer_median",
+                            conditions=[
+                                "submitted captures",
+                                "comparable framing",
+                                "SDR sRGB analysis",
+                            ],
+                        ),
+                        claim_version=version,
+                        region="whole",
+                        attribute=attribute,
+                        direction=direction,
+                        comparison="peer_median",
+                        conditions=[
+                            "submitted captures",
+                            "comparable framing",
+                            "SDR sRGB analysis",
+                        ],
+                        supporting_scene_ids=buckets["support"],
+                        contradicting_scene_ids=buckets["counterexample"],
+                        unknown_scene_ids=buckets["unknown"],
+                        incomparable_scene_ids=buckets["incomparable"],
+                        scene_family_by_id=families,
+                        model_agreement=0,
+                        objective_support=1,
+                        scene_validity=1,
+                        measurement_evidence=evidence,
                         alternative_explanations=[
                             "capture exposure differences",
-                            "scene mismatch or timing variation",
-                            "global tone-mapping differences",
-                        ],
-                    )
-                )
-            )
-        if lower_clip_support:
-            claims.append(
-                adjudicate_claim(
-                    ClaimCandidate(
-                        device_id=device_id,
-                        statement=(
-                            "Across the matched groups listed as evidence, this device tends to show a "
-                            "lower near-white clipping ratio than the group median."
-                        ),
-                        claim_type="strategy",
-                        supporting_scene_ids=lower_clip_support,
-                        contradicting_scene_ids=lower_clip_counter,
-                        model_agreement=0.7,
-                        objective_support=1.0,
-                        scene_validity=0.85,
-                        alternative_explanations=[
-                            "lower base exposure",
-                            "different highlight area due to framing",
-                            "highlight compression rather than detail preservation",
+                            "framing and timing differences",
+                            "global tone and color rendering",
                         ],
                     )
                 )

@@ -231,3 +231,7 @@ cd web && npm install && npm test -- --run && npm run build
 - Cross-scene strategy claims require repeated support and retain counterexamples.
 - Quick-mode reports are operationally final but may still contain explicitly flagged unresolved review items.
 - Results apply to the submitted devices, firmware, shooting modes, people, and environments.
+
+## 2026-10-19 evidence upgrade
+
+The active pipeline uses frozen pairing, explicit SDR color/EXIF records, all-face native evidence, proposition-aware review, scene-family counterexamples and claim-bound external sources. Reports remain model-assisted until independently calibrated. See [implementation results and annotation API](docs/evaluation_upgrade/2026-10-19/IMPLEMENTATION_RESULTS.md) for shipped scope and remaining gates. Install Noto Sans CJK for Chinese DOCX/PDF rendering.

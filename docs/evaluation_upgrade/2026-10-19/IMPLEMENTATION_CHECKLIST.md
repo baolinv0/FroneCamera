@@ -1,6 +1,6 @@
 # 执行任务与验收清单
 
-状态：全部待实施。此清单是计划，不是测试结果。基线见 [README](README.md)。
+状态：原始验收清单保留；已实施核心工程。逐项完成/部分完成/未执行状态及验证记录见 [IMPLEMENTATION_RESULTS](IMPLEMENTATION_RESULTS.md)。未勾选项不能据此宣称全部未动工，也不能依据代码存在宣称完整验收。基线见 [README](README.md)。
 
 ## 使用方式
 

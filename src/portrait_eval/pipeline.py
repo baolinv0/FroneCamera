@@ -3,21 +3,31 @@ from __future__ import annotations
 import hashlib
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlparse
+from uuid import uuid4
 
 from sqlalchemy.orm import Session
 
 from portrait_eval.adjudication import adjudicate_claim
+from portrait_eval.annotations import latest_scene_annotation
 from portrait_eval.attribution import attribute_output_claim
 from portrait_eval.bias import assess_capture_bias
 from portrait_eval.corroboration import CorroborationAdapter, HeuristicCorroborationAdapter
+from portrait_eval.evidence import (
+    claim_identity,
+    measure_observation,
+    measured_statement,
+    related_external,
+    review_relation,
+)
 from portrait_eval.hardware import build_hardware_queries
 from portrait_eval.imaging import analyze_image, audit_scene
 from portrait_eval.models import (
     ClaimCandidate,
     ModelEvaluationResult,
-    ModelObservation,
     ProjectStatus,
 )
+from portrait_eval.report_model import challenge_matrix, device_profiles
 from portrait_eval.reporting import ReportPayload, render_report_bundle
 from portrait_eval.repository import Repository
 from portrait_eval.research import (
@@ -45,16 +55,33 @@ def _restore_device_ids(
     result: ModelEvaluationResult, reverse: dict[str, str]
 ) -> ModelEvaluationResult:
     observations = [
-        ModelObservation(
-            device_id=reverse.get(item.device_id, item.device_id),
-            dimension=item.dimension,
-            statement=item.statement,
-            evidence_refs=item.evidence_refs,
-            certainty=item.certainty,
+        item.model_copy(
+            update={
+                "device_id": reverse.get(item.device_id, item.device_id),
+                "comparison": reverse.get(item.comparison, item.comparison),
+                "evidence_refs": [_restore_reference(ref, reverse) for ref in item.evidence_refs],
+            }
         )
         for item in result.observations
     ]
-    return result.model_copy(update={"observations": observations})
+    viewed = [
+        {
+            **item,
+            "evidence_id": _restore_reference(item.get("evidence_id", ""), reverse),
+            "device_id": reverse.get(
+                item.get("anonymous_device", ""), item.get("anonymous_device", "unknown")
+            ),
+        }
+        for item in result.viewed_evidence
+    ]
+    return result.model_copy(update={"observations": observations, "viewed_evidence": viewed})
+
+
+def _restore_reference(reference: str, reverse: dict[str, str]) -> str:
+    parts = reference.split(":")
+    if len(parts) >= 3 and parts[0] in {"asset", "metric", "crop"}:
+        parts[2] = reverse.get(parts[2], parts[2])
+    return ":".join(parts)
 
 
 class EvaluationPipeline:
@@ -79,17 +106,33 @@ class EvaluationPipeline:
         project = self.repo.get_project(project_id)
         if project.status != ProjectStatus.PAIRING_CONFIRMED.value:
             raise ValueError("Pairing must be confirmed before analysis")
+        snapshots = self.repo.list_pairing_snapshots(project_id)
+        frozen = next(
+            (row["payload"] for row in snapshots if row["version"] == project.version), None
+        )
+        if frozen is None:
+            raise ValueError("Confirmed pairing snapshot is missing; confirm the pairing again")
         project.status = ProjectStatus.ANALYZING.value
         self.session.commit()
-        pairing = self.repo.get_pairing(project_id)
+        pairing = frozen
+        claim_version = f"0.2:{pairing['version']}:{uuid4().hex[:12]}"
+        self.claim_version = claim_version
+        run_key = claim_version.rsplit(":", 1)[-1]
+        asset_manifest = []
         scene_results: list[dict[str, Any]] = []
         all_findings: list[dict[str, Any]] = []
 
         for group in pairing["groups"]:
-            metrics: dict[str, dict[str, object]] = {}
+            annotation = latest_scene_annotation(self.repo, project_id, group["group_id"])
+            if annotation.get("expected_pairing_version") != pairing["version"]:
+                annotation = {}
+            metrics: dict[str, dict[str, Any]] = {}
             paths: dict[str, Path] = {}
             for device_id, cell in group["cells"].items():
                 if cell is None:
+                    asset_manifest.append(
+                        {"scene_id": group["group_id"], "device_id": device_id, "status": "missing"}
+                    )
                     continue
                 path = Path(cell["path"])
                 artifact_dir = (
@@ -97,12 +140,31 @@ class EvaluationPipeline:
                     / "projects"
                     / project_id
                     / "diagnostics"
+                    / run_key
                     / group["group_id"]
                     / device_id
                 )
-                result = analyze_image(path, artifact_dir)
+                face_annotations = annotation.get("faces", {}).get(device_id)
+                result = analyze_image(path, artifact_dir, face_annotations=face_annotations)
+                if cell.get("checksum") and cell["checksum"] != result["rendering"]["input_sha256"]:
+                    raise ValueError(
+                        "Input changed after pairing confirmation; rescan and confirm before analysis"
+                    )
+                result["image_id"] = cell["image_id"]
+                result["asset_id"] = f"asset:{group['group_id']}:{device_id}"
+                result["annotation_revision"] = annotation.get("revision")
+                asset_manifest.append(
+                    {
+                        "scene_id": group["group_id"],
+                        "device_id": device_id,
+                        "image_id": cell["image_id"],
+                        "sha256": result["rendering"]["input_sha256"],
+                        "status": "analyzed",
+                        "rendering": result["rendering"],
+                    }
+                )
                 metrics[device_id] = result
-                paths[device_id] = path
+                paths[device_id] = Path(result["analysis_path"])
                 self.repo.save_analysis(
                     project_id,
                     "image_metrics",
@@ -112,6 +174,18 @@ class EvaluationPipeline:
                 )
 
             audit = audit_scene(metrics)
+            audit["pairing_basis"] = "user_confirmed_same_scene_not_pixel_aligned"
+            if annotation:
+                audit["challenge"] = {
+                    "primary": annotation["challenge"],
+                    "basis": "manual_annotation",
+                    "author": annotation["author"],
+                    "revision": annotation["revision"],
+                }
+                audit["attribute_comparability"].update(
+                    annotation.get("attribute_comparability", {})
+                )
+            audit["scene_family"] = annotation.get("scene_family")
             self.repo.save_analysis(project_id, "scene_audit", audit, scene_group_id=group["id"])
             if len(paths) < 2:
                 self.repo.create_review_item(
@@ -121,14 +195,54 @@ class EvaluationPipeline:
                     priority="high",
                 )
                 scene_results.append(
-                    {"group_id": group["group_id"], "audit": audit, "metrics": metrics}
+                    {
+                        "group_id": group["group_id"],
+                        "audit": audit,
+                        "metrics": metrics,
+                        "scene_family": annotation.get("scene_family"),
+                        "missing_devices": [
+                            key for key, value in group["cells"].items() if value is None
+                        ],
+                    }
                 )
                 continue
 
             forward, reverse = _anonymous_mapping(group["group_id"], list(paths))
             anonymous_paths = {forward[device_id]: path for device_id, path in paths.items()}
             anonymous_metrics = {
-                forward[device_id]: payload for device_id, payload in metrics.items()
+                forward[device_id]: {
+                    "whole": payload["whole"],
+                    "regions": payload.get("regions", {}),
+                    "faces": [
+                        {key: value for key, value in face.items() if key != "native_crop_path"}
+                        for face in payload.get("faces", [])
+                    ],
+                    "color_status": payload["rendering"]["color_status"],
+                    "color_claims_allowed": payload["rendering"]["color_claims_allowed"],
+                    "warnings": payload.get("warnings", []),
+                }
+                for device_id, payload in metrics.items()
+            }
+            evidence_inputs = {
+                forward[device]: [
+                    {
+                        "evidence_id": f"asset:{group['group_id']}:{forward[device]}",
+                        "kind": "whole",
+                        "path": str(paths[device]),
+                        "rendering_version": metrics[device]["rendering"]["version"],
+                    },
+                    *[
+                        {
+                            "evidence_id": f"crop:{group['group_id']}:{forward[device]}:{face['face_id']}",
+                            "kind": "native_face",
+                            "path": face["native_crop_path"],
+                            "bbox_xywh": face["bbox_xywh"],
+                            "face_id": face["face_id"],
+                        }
+                        for face in metrics[device]["faces"]
+                    ],
+                ]
+                for device in paths
             }
             self.repo.save_analysis(
                 project_id,
@@ -140,7 +254,11 @@ class EvaluationPipeline:
             primary_visual_raw = self.primary.analyze(
                 group["group_id"],
                 anonymous_paths,
-                {"audit": audit, "pass": "visual"},
+                {
+                    "audit": {key: audit[key] for key in ("challenge", "pairing_basis")},
+                    "pass": "visual",
+                    "evidence_inputs": evidence_inputs,
+                },
             )
             primary_raw = self.primary.analyze(
                 group["group_id"],
@@ -149,13 +267,18 @@ class EvaluationPipeline:
                     "metrics": anonymous_metrics,
                     "audit": audit,
                     "pass": "metric_validation",
+                    "evidence_inputs": evidence_inputs,
                     "visual_observation": primary_visual_raw.model_dump(mode="json"),
                 },
             )
             reviewer_independent_raw = self.reviewer.analyze(
                 group["group_id"],
                 anonymous_paths,
-                {"audit": audit, "pass": "independent_visual"},
+                {
+                    "audit": {key: audit[key] for key in ("challenge", "pairing_basis")},
+                    "pass": "independent_visual",
+                    "evidence_inputs": evidence_inputs,
+                },
             )
             reviewer_challenge_raw = self.reviewer.analyze(
                 group["group_id"],
@@ -164,6 +287,7 @@ class EvaluationPipeline:
                     "metrics": anonymous_metrics,
                     "audit": audit,
                     "pass": "challenge",
+                    "evidence_inputs": evidence_inputs,
                     "primary": primary_raw.model_dump(mode="json"),
                     "reviewer_independent": reviewer_independent_raw.model_dump(mode="json"),
                 },
@@ -205,11 +329,16 @@ class EvaluationPipeline:
                 primary,
                 reviewer_independent,
                 reviewer_challenge,
+                metrics,
             )
             all_findings.extend(scene_findings)
             scene_results.append(
                 {
                     "group_id": group["group_id"],
+                    "scene_family": annotation.get("scene_family"),
+                    "missing_devices": [
+                        key for key, value in group["cells"].items() if value is None
+                    ],
                     "audit": audit,
                     "metrics": metrics,
                     "primary_visual": primary_visual.model_dump(mode="json"),
@@ -220,7 +349,17 @@ class EvaluationPipeline:
                 }
             )
 
-        strategy_claims = infer_cross_scene_claims(scene_results)
+        self.repo.save_analysis(
+            project_id,
+            "asset_manifest",
+            {
+                "schema_version": "0.2",
+                "claim_version": claim_version,
+                "pairing_version": pairing["version"],
+                "assets": asset_manifest,
+            },
+        )
+        strategy_claims = infer_cross_scene_claims(scene_results, claim_version)
         for claim in strategy_claims:
             finding = claim.model_dump(mode="json")
             finding["evidence"] = claim.supporting_scene_ids
@@ -271,19 +410,27 @@ class EvaluationPipeline:
                 for scene_id in scene_ids
                 if audit_by_group.get(scene_id, {}).get("status") == "FULLY_COMPARABLE"
             )
-            related_external = [
-                item for item in external if item.get("claim_statement") == finding.get("statement")
-            ]
+            related_records = related_external(finding, external)
             assessment = assess_capture_bias(
                 supporting_scene_count=len(scene_ids),
                 comparable_scene_count=comparable_count,
                 independent_support_count=sum(
-                    item.get("supports_claim") is True for item in related_external
+                    item.get("supports_claim") is True
+                    and item.get("independent_support_eligible") is True
+                    for item in related_records
                 ),
                 independent_contradiction_count=sum(
-                    item.get("supports_claim") is False for item in related_external
+                    item.get("supports_claim") is False
+                    and item.get("independent_support_eligible") is True
+                    for item in related_records
                 ),
             ).model_dump(mode="json")
+            assessment.update(
+                {
+                    key: finding.get(key)
+                    for key in ("claim_id", "claim_version", "device_id", "attribute")
+                }
+            )
             assessment["claim_statement"] = finding.get("statement")
             bias_assessments.append(assessment)
             if assessment["status"] == "RESHOOT_REQUIRED_FOR_GENERALIZATION":
@@ -293,26 +440,25 @@ class EvaluationPipeline:
         self.repo.save_analysis(project_id, "capture_bias_assessment", bias_assessments)
 
         attribution_cases: list[dict[str, Any]] = []
-        device_exif: dict[str, dict[str, Any]] = {}
-        for group in pairing["groups"]:
-            for device_id, cell in group["cells"].items():
-                if cell and cell.get("exif") and device_id not in device_exif:
-                    device_exif[device_id] = dict(cell["exif"])
-        hardware_by_device: dict[str, list[dict[str, Any]]] = {}
-        for source in hardware_context:
-            hardware_by_device.setdefault(str(source.get("device_id")), []).append(source)
+        cells_by_group = {group["group_id"]: group["cells"] for group in pairing["groups"]}
         for finding in all_findings:
-            if finding.get("claim_type") != "strategy":
-                continue
-            attribution = attribute_output_claim(
-                finding["statement"],
-                hardware_context={"sources": hardware_by_device.get(finding["device_id"], [])},
-                exif_context=device_exif.get(finding["device_id"], {}),
-            ).model_dump(mode="json")
-            attribution["device_id"] = finding["device_id"]
-            attribution["supporting_scene_ids"] = finding.get("supporting_scene_ids", [])
-            attribution_cases.append(attribution)
-            self.repo.create_review_item(project_id, "mechanism_attribution_review", attribution)
+            for scene_id in finding.get("supporting_scene_ids", []):
+                cell = cells_by_group.get(scene_id, {}).get(finding["device_id"])
+                if not cell:
+                    continue
+                attribution = attribute_output_claim(
+                    finding["statement"], hardware_context={}, exif_context=cell.get("exif", {})
+                ).model_dump(mode="json")
+                attribution.update(
+                    {
+                        key: finding.get(key)
+                        for key in ("claim_id", "claim_version", "device_id", "attribute")
+                    }
+                )
+                attribution["scene_id"] = scene_id
+                attribution["image_id"] = cell["image_id"]
+                attribution["supporting_scene_ids"] = [scene_id]
+                attribution_cases.append(attribution)
         self.repo.save_analysis(project_id, "attribution_case", attribution_cases)
 
         device_names = {device["id"]: device["name"] for device in pairing["devices"]}
@@ -320,47 +466,61 @@ class EvaluationPipeline:
         for group in pairing["groups"]:
             selected_cells = [
                 (device_id, cell) for device_id, cell in group["cells"].items() if cell is not None
-            ][:6]
+            ]
             visual_assets.extend(
                 {
                     "scene_id": group["group_id"],
                     "device_id": device_id,
                     "device_name": device_names.get(device_id, device_id),
-                    "path": cell["path"],
+                    "path": next(
+                        (
+                            scene["metrics"][device_id]["analysis_path"]
+                            for scene in scene_results
+                            if scene["group_id"] == group["group_id"]
+                            and device_id in scene["metrics"]
+                        ),
+                        cell["path"],
+                    ),
                     "filename": cell["filename"],
                 }
                 for device_id, cell in selected_cells
             )
-        device_profiles = []
-        for device in pairing["devices"]:
-            strategy_findings = [
-                item["statement"]
-                for item in all_findings
-                if item.get("device_id") == device["id"]
-                and item.get("claim_type") == "strategy"
-                and item.get("grade") in {"A", "B"}
-            ]
-            device_profiles.append(
-                {
-                    "device_id": device["id"],
-                    "device_name": device["name"],
-                    "label": "Evidence Profile",
-                    "summary": "；".join(strategy_findings[:2])
-                    or "需要更多跨场景证据形成稳定画像。",
-                }
-            )
+        profiles = device_profiles(pairing["devices"], all_findings)
 
         report_payload = ReportPayload(
             project_name=project.name,
+            schema_version="0.2",
+            all_claims=all_findings,
+            challenge_matrix=challenge_matrix(scene_results),
+            coverage={
+                "assets": len([item for item in asset_manifest if item["status"] == "analyzed"]),
+                "missing_slots": len(
+                    [item for item in asset_manifest if item["status"] == "missing"]
+                ),
+                "scene_positions": len(scene_results),
+                "confirmed_families": len(
+                    {scene["scene_family"] for scene in scene_results if scene.get("scene_family")}
+                ),
+                "pairing_version": pairing["version"],
+            },
+            review_provenance={
+                "human_review": "pending",
+                "calibration": "not_performed",
+                "claim_version": claim_version,
+                "primary_model": getattr(self.primary, "model", type(self.primary).__name__),
+                "reviewer_model": getattr(self.reviewer, "model", type(self.reviewer).__name__),
+                "independence": "not_verified",
+                "prompt_version": "evidence-0.2",
+            },
             devices=[device["name"] for device in pairing["devices"]],
             findings=[item for item in all_findings if item["grade"] in {"A", "B"}],
             scene_results=scene_results,
             visual_assets=visual_assets,
-            device_profiles=device_profiles,
+            device_profiles=profiles,
             methodology_notes=[
                 "同一场景内先进行匿名横向比较，再恢复设备身份。",
-                "客观指标、主模型、独立审阅和挑战审阅共同进入裁决。",
-                "只把 A/B 级证据写入正式结论，C 级保留为复核线索。",
+                "主评与复核是否独立由模型来源记录决定；同模型多轮不作为独立证据。",
+                "A/B/C 为未校准规则标签；完整主张与反例保留在附录，尚未完成人工验证。",
             ],
             external_validation=external,
             hardware_context=hardware_context,
@@ -373,9 +533,12 @@ class EvaluationPipeline:
                 "Unknown scene labels and single captures reduce cross-scene generalization confidence.",
             ],
         )
-        report_dir = self.workspace / "projects" / project_id / "reports"
-        bundle = render_report_bundle(report_payload, report_dir, version="0.1", status="draft")
-        self.repo.save_report(project_id, "0.1", "draft", str(bundle["html"]))
+        report_version = f"0.2.{run_key}"
+        report_dir = self.workspace / "projects" / project_id / "reports" / run_key
+        bundle = render_report_bundle(
+            report_payload, report_dir, version=report_version, status="draft"
+        )
+        self.repo.save_report(project_id, report_version, "draft", str(bundle["html"]))
         review_count = len(
             [item for item in self.repo.list_review_items(project_id) if item["status"] == "open"]
         )
@@ -399,57 +562,104 @@ class EvaluationPipeline:
         project_id: str,
         scene_group_id: str,
         group_key: str,
-        audit: dict[str, object],
+        audit: dict[str, Any],
         primary: ModelEvaluationResult,
         reviewer: ModelEvaluationResult,
         challenge: ModelEvaluationResult,
+        metrics: dict[str, Any],
     ) -> list[dict[str, Any]]:
         findings: list[dict[str, Any]] = []
         for observation in primary.observations:
-            independent_match = any(
-                item.device_id == observation.device_id and item.dimension == observation.dimension
-                for item in reviewer.observations
-            )
-            challenge_match = any(
-                item.device_id == observation.device_id and item.dimension == observation.dimension
-                for item in challenge.observations
-            )
-            model_agreement = (
-                1.0
-                if independent_match and challenge_match
-                else 0.75
-                if independent_match or challenge_match
-                else 0.35
-            )
-            if not independent_match or not challenge_match:
+            if observation.device_id not in metrics:
+                self.repo.create_review_item(
+                    project_id, "unknown_observation_device", observation.model_dump(mode="json")
+                )
+                continue
+            relations = []
+            for review in (reviewer, challenge):
+                candidates = [review_relation(observation, item) for item in review.observations]
+                relations.append(
+                    "contradicts"
+                    if "contradicts" in candidates
+                    else "supports"
+                    if "supports" in candidates
+                    else "unknown"
+                )
+            if relations != ["supports", "supports"]:
                 self.repo.create_review_item(
                     project_id,
                     "model_conflict",
                     {
                         "group_id": group_key,
                         "primary_observation": observation.model_dump(mode="json"),
-                        "independent_match": independent_match,
-                        "challenge_match": challenge_match,
-                        "reviewer_independent": reviewer.model_dump(mode="json"),
-                        "reviewer_challenge": challenge.model_dump(mode="json"),
+                        "review_relations": relations,
                     },
-                    priority="high" if not independent_match and not challenge_match else "medium",
+                    priority="high",
                 )
+            objective_support, measurements = measure_observation(observation, metrics, audit)
+            validity = (
+                0.0
+                if audit["status"] == "NOT_COMPARABLE"
+                else 1.0
+                if audit["status"] == "FULLY_COMPARABLE"
+                else 0.6
+            )
+            key = (
+                observation.attribute
+                if observation.attribute in audit.get("attribute_comparability", {})
+                else observation.dimension
+            )
+            if audit.get("attribute_comparability", {}).get(key) in {
+                "NOT_COMPARABLE",
+                "INSUFFICIENT_EVIDENCE",
+            }:
+                objective_support = None
             claim = ClaimCandidate(
                 device_id=observation.device_id,
                 statement=observation.statement,
                 claim_type="observation",
+                claim_id=claim_identity(
+                    observation.device_id,
+                    group_key,
+                    observation.statement,
+                    observation.region,
+                    observation.attribute,
+                    observation.direction,
+                    self.claim_version,
+                    comparison=observation.comparison,
+                    conditions=observation.conditions,
+                ),
+                claim_version=self.claim_version,
+                region=observation.region,
+                attribute=observation.attribute,
+                direction=observation.direction,
+                comparison=observation.comparison,
+                conditions=observation.conditions,
                 supporting_scene_ids=[group_key],
-                contradicting_scene_ids=[],
-                model_agreement=model_agreement,
-                objective_support=1.0,
-                scene_validity=1.0 if audit["status"] == "FULLY_COMPARABLE" else 0.6,
+                contradicting_scene_ids=[group_key]
+                if "contradicts" in relations or objective_support == 0
+                else [],
+                model_agreement=relations.count("supports") / 2,
+                objective_support=objective_support,
+                scene_validity=validity,
+                measurement_evidence=measurements,
+                review_relations=relations,
+                reviewer_dependency="same_model_family"
+                if primary.model_family != "unknown"
+                and primary.model_family == reviewer.model_family
+                else "independence_not_verified",
                 alternative_explanations=["capture variation", "framing difference"],
             )
+            if objective_support is not None:
+                claim.statement = measured_statement(observation)
             adjudicated = adjudicate_claim(claim)
             finding = adjudicated.model_dump(mode="json")
-            finding["evidence"] = [group_key]
-            finding["claim_type"] = "observation"
+            finding.update(
+                evidence=[group_key],
+                evidence_refs=observation.evidence_refs,
+                model_statement=observation.statement,
+                claim_type="observation",
+            )
             findings.append(finding)
             self.repo.save_analysis(project_id, "claim", finding, scene_group_id=scene_group_id)
             if adjudicated.grade.value == "C":
@@ -491,7 +701,7 @@ class EvaluationPipeline:
             device_name = device.get("canonical_model") or device["name"]
             for query in build_corroboration_queries(device_name, finding["statement"]):
                 for item in self.search.search(query, limit=3):
-                    key = (item.url, finding["statement"])
+                    key = (item.url, finding["claim_id"])
                     if key in seen_pairs:
                         continue
                     seen_pairs.add(key)
@@ -510,6 +720,15 @@ class EvaluationPipeline:
                     record["supports_claim"] = decision.supports_claim
                     record["query"] = query
                     record["claim_statement"] = finding["statement"]
-                    record["device_id"] = finding["device_id"]
+                    record.update(
+                        {
+                            key: finding.get(key)
+                            for key in ("claim_id", "claim_version", "device_id", "attribute")
+                        }
+                    )
+                    record["scene_ids"] = finding.get("supporting_scene_ids", [])
+                    record["evidence_scope"] = "search_excerpt_background"
+                    record["independent_support_eligible"] = False
+                    record["source_family"] = urlparse(item.url).netloc.casefold()
                     external.append(record)
         return external

@@ -14,6 +14,7 @@ from portrait_eval.api import _adapter_set
 from portrait_eval.api import create_app as create_base_app
 from portrait_eval.config import Settings
 from portrait_eval.database import Database, ReportRow
+from portrait_eval.report_assets import report_asset_path, served_report_html
 from portrait_eval.reporting import render_pdf_report
 from portrait_eval.repository import Repository
 from portrait_eval.tasking import TaskService
@@ -121,7 +122,21 @@ def register_product_routes(app: FastAPI) -> None:
             raise HTTPException(status_code=404, detail="Report not found")
         path = _report_path(settings, row)
         return HTMLResponse(
-            path.read_text(encoding="utf-8"),
+            served_report_html(path, f"/reports/{report_id}/assets/", token=token),
+            headers={"Cache-Control": "private, no-store"},
+        )
+
+    @app.get("/reports/{report_id}/assets/{filename}")
+    def public_report_asset(
+        report_id: str, filename: str, token: str, repo: Repository = Depends(repository)
+    ) -> FileResponse:
+        validate_share_token(report_id, token)
+        row = repo.session.get(ReportRow, report_id)
+        if row is None:
+            raise HTTPException(status_code=404, detail="Report not found")
+        path = _report_path(settings, row)
+        return FileResponse(
+            report_asset_path(path, filename, settings.workspace),
             headers={"Cache-Control": "private, no-store"},
         )
 

@@ -204,25 +204,38 @@ def propose_pairing(scans: Iterable[DeviceScan]) -> PairingDraft:
     scan_list = list(scans)
     if len(scan_list) < 2:
         raise ValueError("At least two devices are required")
-    reference = max(scan_list, key=lambda scan: len(scan.files))
+    reference = max(
+        scan_list, key=lambda scan: (len(scan.files), len(scan.sequence_slots or scan.files))
+    )
+    reference_slots = reference.sequence_slots or reference.files
+    reference_count = max(len(scan.sequence_slots or scan.files) for scan in scan_list)
+    uncertain_reference_positions = len(reference_slots) != reference_count
+    file_positions = [index for index, path in enumerate(reference_slots) if path is not None]
     cells_by_group: list[dict[str, Path | None]] = [
-        {scan.device_id: None for scan in scan_list} for _ in range(len(reference.files))
+        {scan.device_id: None for scan in scan_list} for _ in range(reference_count)
     ]
-    confidence_by_group: list[list[float]] = [[] for _ in reference.files]
-    strategies_by_group: list[list[str]] = [[] for _ in reference.files]
+    confidence_by_group: list[list[float]] = [[] for _ in range(reference_count)]
+    strategies_by_group: list[list[str]] = [[] for _ in range(reference_count)]
     feature_cache: dict[Path, np.ndarray | None] = {}
-    cells_by_group_ids = range(len(reference.files))
-    for ref_index, path in enumerate(reference.files):
+    cells_by_group_ids = range(reference_count)
+    for ref_index, path in enumerate(reference_slots):
         cells_by_group[ref_index][reference.device_id] = path
 
     for scan in scan_list:
         if scan is reference:
             continue
-        strong_mapping = _strong_order_mapping(scan, len(reference.files))
+        strong_mapping = _strong_order_mapping(scan, reference_count)
         if strong_mapping is not None:
             mapping, confidences, strategy = strong_mapping
         else:
             mapping, confidences = _align_to_reference(reference, scan, feature_cache)
+            mapping = {
+                file_positions[ref_index]: candidate_index
+                for ref_index, candidate_index in mapping.items()
+            }
+            confidences = {
+                file_positions[ref_index]: value for ref_index, value in confidences.items()
+            }
             strategy = "content_sequence_alignment"
         for ref_index, candidate_index in mapping.items():
             cells_by_group[ref_index][scan.device_id] = scan.files[candidate_index]
@@ -237,6 +250,8 @@ def propose_pairing(scans: Iterable[DeviceScan]) -> PairingDraft:
         confidence = round(float(np.median(confidence_values)), 3) if confidence_values else None
         low_confidence = confidence is None or confidence < 0.55
         notes = [f"reference_device={reference.device_id}", *strategies_by_group[index]]
+        if uncertain_reference_positions:
+            notes.append("reference_has_fewer_slots_than_raw_inventory_manual_mapping_required")
         if missing:
             notes.append(f"missing_devices={','.join(missing)}")
         if low_confidence:
@@ -247,6 +262,7 @@ def propose_pairing(scans: Iterable[DeviceScan]) -> PairingDraft:
                 cells=cells,
                 matching_confidence=confidence,
                 review_required=low_confidence
+                or uncertain_reference_positions
                 or sum(path is not None for path in cells.values()) < 2,
                 match_notes=notes,
             )

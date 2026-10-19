@@ -1,7 +1,7 @@
-FROM node:22-alpine AS build
+FROM node:24-alpine AS build
 WORKDIR /app
 COPY web/package*.json ./
-RUN npm install --no-package-lock
+RUN npm ci
 COPY web ./
 RUN npm run build
 FROM nginx:1.27-alpine
