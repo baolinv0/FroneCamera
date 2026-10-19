@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>FroneCamera Review Console</title>
+  <style>
+    :root{font-family:Inter,system-ui,sans-serif;color:#18212f;background:#f4f6f8}
+    body{margin:0}.shell{max-width:1280px;margin:auto;padding:24px}.bar{display:flex;justify-content:space-between;align-items:center}
+    .card{background:white;border:1px solid #dfe4ea;border-radius:10px;padding:18px;margin:14px 0;box-shadow:0 1px 3px #0000000d}
+    input,button{padding:9px 11px;border:1px solid #b8c0cc;border-radius:7px;margin:4px}button{cursor:pointer;background:#172b4d;color:white}
+    button.secondary{background:white;color:#172b4d}.grid{overflow:auto}table{border-collapse:collapse;width:100%}th,td{border-bottom:1px solid #e5e8ec;padding:10px;text-align:left}
+    .status{font-size:12px;padding:3px 7px;border-radius:12px;background:#e8eef8}.review{background:#fee4e2;color:#b42318}.matched{background:#dcfae6;color:#067647}.muted{color:#667085}.error{color:#b42318;white-space:pre-wrap}
+  </style>
+</head>
+<body><main class="shell">
+  <div class="bar"><div><h1>FroneCamera</h1><p class="muted">Evidence-oriented front-camera portrait evaluation</p></div><input id="token" placeholder="API token (optional)" /></div>
+  <section class="card"><h2>Create project</h2><input id="projectName" placeholder="Project name" /><button onclick="createProject()">Create</button></section>
+  <section class="card"><h2>Projects</h2><button class="secondary" onclick="loadProjects()">Refresh</button><div id="projects"></div></section>
+  <section class="card" id="workspace" hidden><h2 id="workspaceTitle"></h2>
+    <div><input id="deviceName" placeholder="Device label" /><input id="deviceModel" placeholder="Canonical model" /><input id="deviceFolder" size="55" placeholder="Linux image folder" /><button onclick="addDevice()">Add device</button></div>
+    <div><button onclick="scan()">Scan & propose pairing</button><button onclick="confirmPairing()">Confirm pairing</button><button onclick="runEvaluation()">Queue evaluation</button><a id="reportLink" target="_blank"></a></div>
+    <p id="message" class="muted"></p><div id="pairing" class="grid"></div><div id="reviews"></div>
+  </section>
+  <pre id="error" class="error"></pre>
+</main><script>
+let currentProject=null;let pairing=null;
+const headers=()=>{const h={'Content-Type':'application/json'};const token=document.getElementById('token').value;if(token)h.Authorization=`Bearer ${token}`;return h};
+async function api(path,options={}){const r=await fetch(path,{...options,headers:{...headers(),...(options.headers||{})}});if(!r.ok)throw new Error(`${r.status}: ${await r.text()}`);return r.headers.get('content-type')?.includes('json')?r.json():r.text()}
+function fail(e){document.getElementById('error').textContent=String(e)}
+async function createProject(){try{await api('/api/projects',{method:'POST',body:JSON.stringify({name:document.getElementById('projectName').value})});loadProjects()}catch(e){fail(e)}}
+async function loadProjects(){try{const rows=await api('/api/projects');document.getElementById('projects').innerHTML=rows.map(p=>`<div><button class="secondary" onclick="openProject('${p.id}','${p.name.replaceAll("'",'')}')">Open</button> <b>${p.name}</b> <span class="status">${p.status}</span></div>`).join('')}catch(e){fail(e)}}
+async function openProject(id,name){currentProject=id;document.getElementById('workspace').hidden=false;document.getElementById('workspaceTitle').textContent=name;await loadPairing();await loadReviews();document.getElementById('reportLink').href=`/api/projects/${id}/reports/latest`;document.getElementById('reportLink').textContent=' Open latest report'}
+async function addDevice(){try{await api(`/api/projects/${currentProject}/devices`,{method:'POST',body:JSON.stringify({name:deviceName.value,canonical_model:deviceModel.value||null,folder_path:deviceFolder.value})});message.textContent='Device added'}catch(e){fail(e)}}
+async function scan(){try{pairing=await api(`/api/projects/${currentProject}/scan`,{method:'POST'});renderPairing()}catch(e){fail(e)}}
+async function loadPairing(){try{pairing=await api(`/api/projects/${currentProject}/pairing`);renderPairing()}catch(e){pairing=null;pairingDiv.innerHTML='No pairing yet'}}
+function renderPairing(){if(!pairing)return;const heads=pairing.devices.map(d=>`<th>${d.name}</th>`).join('');const rows=pairing.groups.map(g=>{const confidence=g.matching_confidence==null?'n/a':`${Math.round(g.matching_confidence*100)}%`;const badge=g.review_required?`<span class="status review" title="${(g.match_notes||[]).join('; ')}">REVIEW ${confidence}</span>`:`<span class="status matched" title="${(g.match_notes||[]).join('; ')}">AUTO ${confidence}</span>`;return `<tr><td>${g.group_id}<br>${badge}</td>${pairing.devices.map(d=>`<td>${g.cells[d.id]?.filename||'<span class="muted">MISSING</span>'}</td>`).join('')}</tr>`}).join('');document.getElementById('pairing').innerHTML=`<p>Version ${pairing.version}; confirmed=${pairing.confirmed}</p><table><thead><tr><th>Group</th>${heads}</tr></thead><tbody>${rows}</tbody></table>`}
+async function confirmPairing(){try{pairing=await api(`/api/projects/${currentProject}/pairing/confirm`,{method:'POST',body:JSON.stringify({expected_version:pairing.version})});renderPairing()}catch(e){fail(e)}}
+async function runEvaluation(){try{const task=await api(`/api/projects/${currentProject}/run`,{method:'POST'});message.textContent=`Queued task ${task.id}. Start portrait-eval-worker on Linux.`}catch(e){fail(e)}}
+async function loadReviews(){try{const items=await api(`/api/projects/${currentProject}/review-items`);document.getElementById('reviews').innerHTML='<h3>Review items</h3>'+items.map(i=>`<article><b>${i.category}</b> ${i.status}<pre>${JSON.stringify(i.payload,null,2)}</pre></article>`).join('')}catch(e){fail(e)}}
+loadProjects();
+</script></body></html>

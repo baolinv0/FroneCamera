@@ -1,0 +1,5 @@
+import type { Pairing } from './types'
+
+export function PairingGrid({ pairing, onChange }: { pairing: Pairing; onChange?: (groupId: string, deviceId: string, imageId: string | null) => void }) {
+  return <div className="scroll"><table><thead><tr><th>Group</th>{pairing.devices.map(device => <th key={device.id}>{device.name}</th>)}</tr></thead><tbody>{pairing.groups.map(group => <tr key={group.id}><td><b>{group.group_id}</b><small>{group.analyzable ? ' analyzable' : ' insufficient'}</small></td>{pairing.devices.map(device => <td key={device.id}>{onChange ? <select aria-label={`${group.group_id}-${device.name}`} value={group.cells[device.id]?.image_id ?? ''} onChange={event => onChange(group.id, device.id, event.target.value || null)}><option value="">MISSING</option>{(pairing.available_images[device.id] ?? []).map(image => <option key={image.image_id} value={image.image_id}>{image.filename}</option>)}</select> : (group.cells[device.id]?.filename ?? <span className="missing">MISSING</span>)}</td>)}</tr>)}</tbody></table></div>
+}
